@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
   Shield,
   KeyRound,
@@ -17,9 +17,9 @@ import {
   AlertTriangle,
   LogOut,
   Sparkles,
-} from 'lucide-react';
-import { useRoomContext } from '../context/RoomContext';
-import { getBaseNetworkUrl, getNetworkIp } from '../utils/network';
+} from "lucide-react";
+import { useRoomContext } from "../context/RoomContext";
+import { getBaseNetworkUrl } from "../utils/network";
 
 export default function AdminPage() {
   const {
@@ -32,8 +32,8 @@ export default function AdminPage() {
     logoutAdmin,
   } = useRoomContext();
 
-  const [passwordInput, setPasswordInput] = useState('');
-  const [authError, setAuthError] = useState('');
+  const [passwordInput, setPasswordInput] = useState("");
+  const [authError, setAuthError] = useState("");
 
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -41,8 +41,8 @@ export default function AdminPage() {
   const [copiedRoom, setCopiedRoom] = useState(null);
 
   // New Room Form State
-  const [newRoomNumber, setNewRoomNumber] = useState('');
-  const [newRoomName, setNewRoomName] = useState('');
+  const [newRoomNumber, setNewRoomNumber] = useState("");
+  const [newRoomName, setNewRoomName] = useState("");
   const [newPermissions, setNewPermissions] = useState({
     allowChat: true,
     allowScreenShare: true,
@@ -51,24 +51,24 @@ export default function AdminPage() {
     isLocked: false,
     askBeforeJoin: false,
   });
-  const [createError, setCreateError] = useState('');
+  const [createError, setCreateError] = useState("");
 
   // 1. Password Login Handler
   const handleLogin = (e) => {
     e.preventDefault();
-    setAuthError('');
+    setAuthError("");
     const success = loginAdmin(passwordInput.trim());
     if (!success) {
-      setAuthError('Incorrect admin password. Please check your .env configuration.');
+      setAuthError("Incorrect admin password.");
     } else {
-      setPasswordInput('');
+      setPasswordInput("");
     }
   };
 
   // 2. Create Room Handler
   const handleCreateRoom = (e) => {
     e.preventDefault();
-    setCreateError('');
+    setCreateError("");
     try {
       createRoom({
         roomNumber: newRoomNumber,
@@ -76,8 +76,8 @@ export default function AdminPage() {
         permissions: newPermissions,
       });
       // Reset & close
-      setNewRoomNumber('');
-      setNewRoomName('');
+      setNewRoomNumber("");
+      setNewRoomName("");
       setNewPermissions({
         allowChat: true,
         allowScreenShare: true,
@@ -88,11 +88,11 @@ export default function AdminPage() {
       });
       setShowCreateModal(false);
     } catch (err) {
-      setCreateError(err.message || 'Failed to create room.');
+      setCreateError(err.message || "Failed to create room.");
     }
   };
 
-  const [saveSuccessMsg, setSaveSuccessMsg] = useState('');
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState("");
 
   // 3. Update Permissions Handler
   const handleSaveEditedPermissions = (e) => {
@@ -100,9 +100,11 @@ export default function AdminPage() {
     if (!editingRoom) return;
 
     updateRoomPermissions(editingRoom.roomNumber, editingRoom.permissions);
-    setSaveSuccessMsg(`Permissions for Room #${editingRoom.roomNumber} updated successfully!`);
+    setSaveSuccessMsg(
+      `Permissions for Room #${editingRoom.roomNumber} updated successfully!`,
+    );
     setEditingRoom(null);
-    setTimeout(() => setSaveSuccessMsg(''), 3500);
+    setTimeout(() => setSaveSuccessMsg(""), 3500);
   };
 
   // 4. Copy Room Link
@@ -115,7 +117,11 @@ export default function AdminPage() {
 
   // 5. Delete Room Handler
   const handleDeleteRoom = (roomNumber) => {
-    if (window.confirm(`Are you sure you want to delete Room #${roomNumber}? Active participants will be disconnected.`)) {
+    if (
+      window.confirm(
+        `Are you sure you want to delete Room #${roomNumber}? Active participants will be disconnected.`,
+      )
+    ) {
       deleteRoom(roomNumber);
     }
   };
@@ -123,8 +129,8 @@ export default function AdminPage() {
   // If not authenticated, show password prompt
   if (!isAdminLoggedIn) {
     return (
-      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-4 py-12">
-        <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/80 p-8 shadow-2xl backdrop-blur-xl">
+      <div className="flex min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100dvh-4rem)] items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-4 py-8">
+        <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/80 p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
             <Shield className="h-7 w-7" />
           </div>
@@ -132,9 +138,6 @@ export default function AdminPage() {
           <h2 className="mt-5 text-center text-2xl font-bold tracking-tight text-white">
             Admin Authentication
           </h2>
-          <p className="mt-1.5 text-center text-xs text-slate-400">
-            Enter the admin password configured in your <code className="text-indigo-300 font-mono">.env</code> file.
-          </p>
 
           {authError && (
             <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">
@@ -157,8 +160,8 @@ export default function AdminPage() {
                   autoFocus
                   value={passwordInput}
                   onChange={(e) => setPasswordInput(e.target.value)}
-                  placeholder="Enter VITE_ADMIN_PASSWORD"
-                  className="w-full rounded-xl border border-slate-700 bg-slate-950/80 py-3 pl-10 pr-4 text-sm font-medium text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                  placeholder="Enter Password"
+                  className="w-full rounded-xl border border-slate-700 bg-slate-950/80 py-3 pl-10 pr-4 text-base sm:text-sm font-medium text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                 />
               </div>
             </div>
@@ -171,10 +174,6 @@ export default function AdminPage() {
               <span>Unlock Admin Panel</span>
             </button>
           </form>
-
-          <div className="mt-6 rounded-lg bg-slate-950/60 p-3 text-center text-[11px] text-slate-500 border border-slate-800/80">
-            Password stored securely in <span className="font-mono text-slate-400">.env</span> as <span className="font-mono text-slate-400">VITE_ADMIN_PASSWORD</span>.
-          </div>
         </div>
       </div>
     );
@@ -182,10 +181,10 @@ export default function AdminPage() {
 
   // Authenticated Admin Dashboard
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100dvh-4rem)] bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-3 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="mx-auto max-w-7xl">
         {/* Admin Dashboard Header */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800/80 pb-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-800/80 pb-5 sm:pb-6">
           <div>
             <div className="flex items-center gap-2">
               <span className="flex h-2 w-2 rounded-full bg-emerald-400"></span>
@@ -193,7 +192,7 @@ export default function AdminPage() {
                 Authenticated Admin Session
               </span>
             </div>
-            <h1 className="mt-1 text-2xl font-extrabold text-white sm:text-3xl">
+            <h1 className="mt-1 text-xl font-extrabold text-white sm:text-3xl">
               Room Management & Permissions
             </h1>
             <p className="text-xs text-slate-400 mt-0.5">
@@ -201,11 +200,11 @@ export default function AdminPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
             <button
               type="button"
               onClick={() => setShowCreateModal(true)}
-              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/30 transition-all hover:bg-indigo-500 hover:scale-[1.02]"
+              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-white shadow-lg shadow-indigo-600/30 transition-all hover:bg-indigo-500 hover:scale-[1.02]"
             >
               <Plus className="h-4 w-4" />
               <span>Create New Room</span>
@@ -214,7 +213,7 @@ export default function AdminPage() {
             <button
               type="button"
               onClick={logoutAdmin}
-              className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
+              className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 sm:px-3.5 sm:py-2.5 text-xs font-semibold text-slate-300 transition-colors hover:bg-slate-700 hover:text-white"
             >
               <LogOut className="h-3.5 w-3.5" />
               <span>Logout</span>
@@ -233,8 +232,12 @@ export default function AdminPage() {
         {/* Stats Row */}
         <div className="my-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-            <span className="text-xs text-slate-400">Total Configured Rooms</span>
-            <div className="mt-1 text-2xl font-extrabold text-white font-mono">{rooms.length}</div>
+            <span className="text-xs text-slate-400">
+              Total Configured Rooms
+            </span>
+            <div className="mt-1 text-2xl font-extrabold text-white font-mono">
+              {rooms.length}
+            </div>
           </div>
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
             <span className="text-xs text-slate-400">Open for Join</span>
@@ -278,7 +281,9 @@ export default function AdminPage() {
                         <span className="rounded-md bg-indigo-500/10 px-2.5 py-0.5 font-mono text-sm font-bold text-indigo-400 border border-indigo-500/20">
                           #{room.roomNumber}
                         </span>
-                        <h3 className="text-base font-semibold text-white">{room.roomName}</h3>
+                        <h3 className="text-base font-semibold text-white">
+                          {room.roomName}
+                        </h3>
                         {perms.isLocked ? (
                           <span className="flex items-center gap-1 rounded-full bg-red-500/10 px-2 py-0.5 text-[10px] font-medium text-red-400 border border-red-500/20">
                             <Lock className="h-3 w-3" /> Locked
@@ -292,26 +297,42 @@ export default function AdminPage() {
 
                       {/* Direct URL */}
                       <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                        <span>URL: {getBaseNetworkUrl()}/room/{room.roomNumber}</span>
+                        <span>
+                          URL: {getBaseNetworkUrl()}/room/{room.roomNumber}
+                        </span>
                       </div>
 
                       {/* Permissions Pills */}
                       <div className="flex flex-wrap items-center gap-1.5 pt-1.5 text-[11px]">
-                        <span className="text-slate-500 mr-1">Permissions:</span>
-                        <span className={`rounded px-2 py-0.5 ${perms.allowChat ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                          Chat: {perms.allowChat ? 'Enabled' : 'Disabled'}
+                        <span className="text-slate-500 mr-1">
+                          Permissions:
                         </span>
-                        <span className={`rounded px-2 py-0.5 ${perms.allowScreenShare ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
-                          Screen: {perms.allowScreenShare ? 'Enabled' : 'Disabled'}
+                        <span
+                          className={`rounded px-2 py-0.5 ${perms.allowChat ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}
+                        >
+                          Chat: {perms.allowChat ? "Enabled" : "Disabled"}
                         </span>
-                        <span className={`rounded px-2 py-0.5 ${perms.allowCamera ? 'bg-slate-800 text-slate-300' : 'bg-red-500/10 text-red-400'}`}>
-                          Video: {perms.allowCamera ? 'On' : 'Off'}
+                        <span
+                          className={`rounded px-2 py-0.5 ${perms.allowScreenShare ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"}`}
+                        >
+                          Screen:{" "}
+                          {perms.allowScreenShare ? "Enabled" : "Disabled"}
                         </span>
-                        <span className={`rounded px-2 py-0.5 ${perms.allowMic ? 'bg-slate-800 text-slate-300' : 'bg-red-500/10 text-red-400'}`}>
-                          Mic: {perms.allowMic ? 'On' : 'Off'}
+                        <span
+                          className={`rounded px-2 py-0.5 ${perms.allowCamera ? "bg-slate-800 text-slate-300" : "bg-red-500/10 text-red-400"}`}
+                        >
+                          Video: {perms.allowCamera ? "On" : "Off"}
                         </span>
-                        <span className={`rounded px-2 py-0.5 ${perms.askBeforeJoin ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-slate-800 text-slate-400'}`}>
-                          Ask to Join: {perms.askBeforeJoin ? 'Required' : 'Off'}
+                        <span
+                          className={`rounded px-2 py-0.5 ${perms.allowMic ? "bg-slate-800 text-slate-300" : "bg-red-500/10 text-red-400"}`}
+                        >
+                          Mic: {perms.allowMic ? "On" : "Off"}
+                        </span>
+                        <span
+                          className={`rounded px-2 py-0.5 ${perms.askBeforeJoin ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-slate-800 text-slate-400"}`}
+                        >
+                          Ask to Join:{" "}
+                          {perms.askBeforeJoin ? "Required" : "Off"}
                         </span>
                       </div>
                     </div>
@@ -321,7 +342,9 @@ export default function AdminPage() {
                       {/* Edit Permissions */}
                       <button
                         type="button"
-                        onClick={() => setEditingRoom(JSON.parse(JSON.stringify(room)))}
+                        onClick={() =>
+                          setEditingRoom(JSON.parse(JSON.stringify(room)))
+                        }
                         className="flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-200 hover:bg-slate-700 hover:text-white transition-colors"
                       >
                         <Settings className="h-3.5 w-3.5 text-indigo-400" />
@@ -340,7 +363,9 @@ export default function AdminPage() {
                         ) : (
                           <Copy className="h-3.5 w-3.5" />
                         )}
-                        <span>{copiedRoom === room.roomNumber ? 'Copied' : 'Link'}</span>
+                        <span>
+                          {copiedRoom === room.roomNumber ? "Copied" : "Link"}
+                        </span>
                       </button>
 
                       {/* Direct Join Link */}
@@ -374,9 +399,11 @@ export default function AdminPage() {
 
       {/* CREATE ROOM MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
-            <h3 className="text-lg font-bold text-white">Create New Video Room</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 sm:p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-white">
+              Create New Video Room
+            </h3>
             <p className="text-xs text-slate-400 mt-1">
               Configure room number and default participant permissions.
             </p>
@@ -398,7 +425,7 @@ export default function AdminPage() {
                   placeholder="e.g. 103, daily-sync"
                   value={newRoomNumber}
                   onChange={(e) => setNewRoomNumber(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 py-2.5 px-3.5 text-sm font-mono text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                  className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 py-2.5 px-3.5 text-base sm:text-sm font-mono text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
                 />
               </div>
 
@@ -411,7 +438,7 @@ export default function AdminPage() {
                   placeholder="e.g. Sales Team Meeting"
                   value={newRoomName}
                   onChange={(e) => setNewRoomName(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 py-2.5 px-3.5 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                  className="mt-1 w-full rounded-xl border border-slate-700 bg-slate-950 py-2.5 px-3.5 text-base sm:text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
                 />
               </div>
 
@@ -426,7 +453,10 @@ export default function AdminPage() {
                     type="checkbox"
                     checked={newPermissions.allowChat}
                     onChange={(e) =>
-                      setNewPermissions({ ...newPermissions, allowChat: e.target.checked })
+                      setNewPermissions({
+                        ...newPermissions,
+                        allowChat: e.target.checked,
+                      })
                     }
                     className="h-4 w-4 rounded accent-indigo-600"
                   />
@@ -438,7 +468,10 @@ export default function AdminPage() {
                     type="checkbox"
                     checked={newPermissions.allowScreenShare}
                     onChange={(e) =>
-                      setNewPermissions({ ...newPermissions, allowScreenShare: e.target.checked })
+                      setNewPermissions({
+                        ...newPermissions,
+                        allowScreenShare: e.target.checked,
+                      })
                     }
                     className="h-4 w-4 rounded accent-indigo-600"
                   />
@@ -450,7 +483,10 @@ export default function AdminPage() {
                     type="checkbox"
                     checked={newPermissions.allowCamera}
                     onChange={(e) =>
-                      setNewPermissions({ ...newPermissions, allowCamera: e.target.checked })
+                      setNewPermissions({
+                        ...newPermissions,
+                        allowCamera: e.target.checked,
+                      })
                     }
                     className="h-4 w-4 rounded accent-indigo-600"
                   />
@@ -462,7 +498,10 @@ export default function AdminPage() {
                     type="checkbox"
                     checked={newPermissions.allowMic}
                     onChange={(e) =>
-                      setNewPermissions({ ...newPermissions, allowMic: e.target.checked })
+                      setNewPermissions({
+                        ...newPermissions,
+                        allowMic: e.target.checked,
+                      })
                     }
                     className="h-4 w-4 rounded accent-indigo-600"
                   />
@@ -474,11 +513,17 @@ export default function AdminPage() {
                     type="checkbox"
                     checked={newPermissions.askBeforeJoin}
                     onChange={(e) =>
-                      setNewPermissions({ ...newPermissions, askBeforeJoin: e.target.checked })
+                      setNewPermissions({
+                        ...newPermissions,
+                        askBeforeJoin: e.target.checked,
+                      })
                     }
                     className="h-4 w-4 rounded accent-amber-500"
                   />
-                  <span>Ask Before Join (Require Admin approval before entering call)</span>
+                  <span>
+                    Ask Before Join (Require Admin approval before entering
+                    call)
+                  </span>
                 </label>
 
                 <label className="flex items-center gap-3 text-xs text-red-300 cursor-pointer pt-2 border-t border-slate-800">
@@ -486,7 +531,10 @@ export default function AdminPage() {
                     type="checkbox"
                     checked={newPermissions.isLocked}
                     onChange={(e) =>
-                      setNewPermissions({ ...newPermissions, isLocked: e.target.checked })
+                      setNewPermissions({
+                        ...newPermissions,
+                        isLocked: e.target.checked,
+                      })
                     }
                     className="h-4 w-4 rounded accent-red-600"
                   />
@@ -516,16 +564,20 @@ export default function AdminPage() {
 
       {/* EDIT PERMISSIONS MODAL */}
       {editingRoom && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 sm:p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl border border-slate-800 bg-slate-900 p-5 sm:p-6 shadow-2xl">
             <h3 className="text-lg font-bold text-white">
               Edit Permissions for Room #{editingRoom.roomNumber}
             </h3>
             <p className="text-xs text-slate-400 mt-1">
-              Changes will immediately take effect for all active and new participants.
+              Changes will immediately take effect for all active and new
+              participants.
             </p>
 
-            <form onSubmit={handleSaveEditedPermissions} className="mt-5 space-y-4">
+            <form
+              onSubmit={handleSaveEditedPermissions}
+              className="mt-5 space-y-4"
+            >
               <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-3">
                 <label className="flex items-center gap-3 text-xs text-slate-300 cursor-pointer">
                   <input
@@ -614,7 +666,10 @@ export default function AdminPage() {
                     }
                     className="h-4 w-4 rounded accent-amber-500"
                   />
-                  <span>Ask Before Join (Require Admin approval before entering call)</span>
+                  <span>
+                    Ask Before Join (Require Admin approval before entering
+                    call)
+                  </span>
                 </label>
 
                 <label className="flex items-center gap-3 text-xs text-red-300 cursor-pointer pt-2 border-t border-slate-800">

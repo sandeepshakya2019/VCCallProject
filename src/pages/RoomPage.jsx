@@ -27,7 +27,7 @@ import {
   KeyRound,
 } from 'lucide-react';
 import { useRoomContext } from '../context/RoomContext';
-import { getBaseNetworkUrl, getNetworkIp } from '../utils/network';
+import { getBaseNetworkUrl } from '../utils/network';
 import { createSyntheticStream } from '../utils/mediaFallback';
 
 export default function RoomPage() {
@@ -892,7 +892,7 @@ export default function RoomPage() {
   // 1. Loading state while verifying room existence from server
   if (!isRoomsLoaded) {
     return (
-      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4">
+      <div className="flex min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100dvh-4rem)] items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4">
         <div className="flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-900/90 px-6 py-4 shadow-xl text-slate-300 text-sm font-semibold backdrop-blur-xl">
           <div className="h-5 w-5 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent"></div>
           <span>Verifying room existence...</span>
@@ -904,7 +904,7 @@ export default function RoomPage() {
   // 2. Room Does Not Exist Screen
   if (isRoomsLoaded && !roomConfig) {
     return (
-      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4 sm:p-6">
+      <div className="flex min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100dvh-4rem)] items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4 sm:p-6">
         <div className="w-full max-w-md rounded-2xl border border-rose-500/30 bg-slate-900/95 p-6 sm:p-8 shadow-2xl backdrop-blur-xl text-center space-y-5">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400">
             <ShieldAlert className="h-8 w-8 text-rose-400" />
@@ -947,7 +947,7 @@ export default function RoomPage() {
   // WAITING FOR ADMIN APPROVAL SCREEN ("Knock / Waiting Room")
   if (isWaitingApproval) {
     return (
-      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4 sm:p-6">
+      <div className="flex min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100dvh-4rem)] items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4 sm:p-6">
         <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/90 p-6 sm:p-8 shadow-2xl backdrop-blur-xl text-center space-y-5">
           <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-2xl border transition-colors ${
             hasAdminJoined
@@ -997,7 +997,7 @@ export default function RoomPage() {
   // PRE-JOIN SCREEN: Ask for Name (Required) and Camera/Mic Preview
   if (!isJoined) {
     return (
-      <div className="flex min-h-[calc(100vh-4rem)] items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4 sm:p-6">
+      <div className="flex min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100dvh-4rem)] items-center justify-center bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 p-4 sm:p-6">
         <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/90 p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
           {/* Header with IP display */}
           <div className="text-center">
@@ -1006,10 +1006,9 @@ export default function RoomPage() {
               <span>Room #{roomNumber}</span>
             </div>
             <h2 className="text-2xl font-extrabold text-white">Join Video Call</h2>
-            <div className="mt-1 flex items-center justify-center gap-2 text-xs text-slate-400">
-              <Wifi className="h-3.5 w-3.5 text-emerald-400" />
-              <span>Network IP: <strong className="text-indigo-300 font-mono">{getNetworkIp()}:5173</strong></span>
-            </div>
+            <p className="mt-1 text-xs text-slate-400 font-medium">
+              Configure your audio and video before entering
+            </p>
           </div>
 
           {/* Self Camera Preview Tile */}
@@ -1104,7 +1103,7 @@ export default function RoomPage() {
                   placeholder="Enter your name (Required)"
                   value={userName}
                   onChange={(e) => setUserName(e.target.value)}
-                  className="w-full rounded-xl border-2 border-slate-700 bg-slate-950/90 py-3 pl-10 pr-4 text-sm font-semibold text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-inner"
+                  className="w-full rounded-xl border-2 border-slate-700 bg-slate-950/90 py-3 pl-10 pr-4 text-base font-semibold text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-inner"
                 />
               </div>
             </div>
@@ -1141,7 +1140,7 @@ export default function RoomPage() {
                       placeholder="Enter admin password (e.g. admin123)"
                       value={adminPasswordInput}
                       onChange={(e) => setAdminPasswordInput(e.target.value)}
-                      className="w-full rounded-lg border border-slate-700 bg-slate-900 py-2 pl-9 pr-3 text-xs text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500/30"
+                      className="w-full rounded-lg border border-slate-700 bg-slate-900 py-2.5 pl-9 pr-3 text-base sm:text-xs text-white placeholder-slate-500 focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500/30"
                     />
                   </div>
                   {adminError && (
@@ -1190,58 +1189,55 @@ export default function RoomPage() {
   };
 
   return (
-    <div className="relative flex h-[calc(100vh-4rem)] w-full overflow-hidden bg-slate-950">
+    <div className="relative flex h-[calc(100dvh-3.5rem)] sm:h-[calc(100dvh-4rem)] w-full overflow-hidden bg-slate-950">
       {/* Main Video Stage */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Top Room Header Bar: Displays IP & Room */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 bg-slate-900/60 px-4 py-2.5 backdrop-blur-md">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
+        {/* Top Room Header Bar */}
+        <div className="flex items-center justify-between gap-2 border-b border-slate-800/80 bg-slate-900/60 px-3 py-2 sm:px-4 sm:py-2.5 backdrop-blur-md">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              <span className="font-mono text-sm font-bold text-white">Room #{roomNumber}</span>
+              <span className="font-mono text-xs sm:text-sm font-bold text-white">#{roomNumber}</span>
             </div>
             <span className="hidden text-xs text-slate-400 sm:inline">|</span>
-            <span className="hidden text-xs font-medium text-slate-300 sm:inline">{roomConfig.roomName}</span>
+            <span className="hidden text-xs font-medium text-slate-300 sm:inline truncate max-w-[150px] md:max-w-[220px]">
+              {roomConfig.roomName}
+            </span>
 
             {/* Participants counter */}
-            <span className="flex items-center gap-1.5 rounded-full bg-slate-800 px-2.5 py-0.5 text-xs font-semibold text-slate-300 border border-slate-700">
-              <Users className="h-3.5 w-3.5 text-indigo-400" />
-              <span>{totalCount} participant{totalCount > 1 ? 's' : ''}</span>
+            <span className="flex items-center gap-1 rounded-full bg-slate-800 px-2 sm:px-2.5 py-0.5 text-[11px] sm:text-xs font-semibold text-slate-300 border border-slate-700 shrink-0">
+              <Users className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-indigo-400" />
+              <span>{totalCount}</span>
+              <span className="hidden sm:inline">participant{totalCount > 1 ? 's' : ''}</span>
             </span>
 
             {/* Admin status indicator in header */}
             {isAdmin && (
-              <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2.5 py-0.5 text-xs font-bold text-amber-400 border border-amber-500/30 shadow-sm">
-                <Crown className="h-3.5 w-3.5" />
-                <span>Host / Admin</span>
+              <span className="flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] sm:text-xs font-bold text-amber-400 border border-amber-500/30 shadow-sm shrink-0">
+                <Crown className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                <span className="hidden sm:inline">Host / Admin</span>
+                <span className="sm:hidden">Admin</span>
               </span>
             )}
           </div>
 
-          {/* Center/Right: Network IP & Link */}
-          <div className="flex items-center gap-2.5">
-            {/* Top IP Display Badge */}
-            <div className="flex items-center gap-1.5 rounded-full border border-slate-700/80 bg-slate-800/90 px-3 py-1 shadow-inner text-xs">
-              <Wifi className="h-3.5 w-3.5 text-emerald-400" />
-              <span className="text-[11px] font-semibold text-slate-400">IP:</span>
-              <code className="font-mono font-bold text-indigo-300">{getNetworkIp()}:5173</code>
-            </div>
-
-            {/* Copy Invite Link */}
+          {/* Center/Right: Copy Link */}
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={handleCopyInviteLink}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-800 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700 hover:text-white"
+              className="flex items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-800 px-2.5 py-1.5 sm:px-3.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700 hover:text-white shadow-sm"
             >
-              {copiedLink ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-              <span>{copiedLink ? 'Link Copied!' : 'Copy Link'}</span>
+              {copiedLink ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5 text-indigo-400" />}
+              <span className="hidden sm:inline">{copiedLink ? 'Link Copied!' : 'Copy Invite Link'}</span>
+              <span className="sm:hidden">{copiedLink ? 'Copied' : 'Invite'}</span>
             </button>
           </div>
         </div>
 
         {/* Admin Knock Request Notifications Bar */}
         {isAdmin && pendingKnocks.length > 0 && (
-          <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2.5 backdrop-blur-md">
+          <div className="bg-amber-500/15 border-b border-amber-500/30 px-3 py-2 sm:px-4 sm:py-2.5 backdrop-blur-md">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2 text-xs font-semibold text-amber-300">
                 <ShieldAlert className="h-4 w-4 shrink-0 text-amber-400 animate-bounce" />
@@ -1278,10 +1274,10 @@ export default function RoomPage() {
         )}
 
         {/* Video Grid Area */}
-        <div className="relative flex-1 p-4 overflow-hidden flex items-center justify-center">
+        <div className="relative flex-1 p-2 sm:p-4 overflow-hidden flex items-center justify-center min-h-0">
           {participantIds.length === 0 ? (
             /* Single User Waiting State */
-            <div className="relative h-full w-full max-w-4xl max-h-[75vh] overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl flex items-center justify-center">
+            <div className="relative h-full w-full max-w-4xl max-h-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl flex items-center justify-center">
               <video
                 ref={(el) => {
                   if (el && localStream && el.srcObject !== localStream) {
@@ -1296,35 +1292,36 @@ export default function RoomPage() {
 
               {isVideoOff && (
                 <div className="flex flex-col items-center justify-center gap-2 text-slate-500">
-                  <VideoOff className="h-12 w-12" />
-                  <span className="text-sm">Your Camera is Off</span>
+                  <VideoOff className="h-10 w-10 sm:h-12 sm:w-12" />
+                  <span className="text-xs sm:text-sm">Your Camera is Off</span>
                 </div>
               )}
 
               {/* Top overlay indicator */}
-              <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none">
-                <span className="rounded-full bg-slate-950/80 px-3 py-1 text-xs text-slate-400 backdrop-blur-md border border-slate-800">
-                  Waiting for peers on your Wi-Fi (IP: {getNetworkIp()}:5173)...
+              <div className="absolute top-3 left-3 right-3 sm:top-4 sm:left-4 sm:right-4 flex items-center justify-between pointer-events-none">
+                <span className="inline-flex items-center gap-2 rounded-full bg-slate-950/85 px-3 py-1 sm:px-3.5 sm:py-1.5 text-[11px] sm:text-xs text-slate-300 backdrop-blur-md border border-slate-800 shadow-md">
+                  <span className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse"></span>
+                  <span>Waiting for others to join...</span>
                 </span>
               </div>
 
               {/* You tag */}
-              <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-full bg-slate-950/80 px-3 py-1 backdrop-blur-md text-xs font-medium text-slate-200">
-                <span>You ({userName || 'User'})</span>
+              <div className="absolute bottom-3 left-3 sm:bottom-4 sm:left-4 flex items-center gap-1.5 sm:gap-2 rounded-full bg-slate-950/80 px-2.5 py-1 sm:px-3 backdrop-blur-md text-xs font-medium text-slate-200">
+                <span className="truncate max-w-[110px] sm:max-w-none">You ({userName || 'User'})</span>
                 {isAdmin && (
-                  <span className="flex items-center gap-1 rounded bg-amber-500/20 text-amber-300 px-1.5 py-0.5 text-[10px] font-bold border border-amber-500/30">
+                  <span className="flex items-center gap-0.5 sm:gap-1 rounded bg-amber-500/20 text-amber-300 px-1.5 py-0.5 text-[10px] font-bold border border-amber-500/30">
                     <Crown className="h-3 w-3" />
                     <span>Admin</span>
                   </span>
                 )}
-                {isMuted && <MicOff className="h-3.5 w-3.5 text-red-400" />}
+                {isMuted && <MicOff className="h-3.5 w-3.5 text-red-400 shrink-0" />}
               </div>
             </div>
           ) : (
             /* Multi-Peer Video Grid */
-            <div className={`grid h-full w-full gap-4 ${getGridClass()} max-h-[75vh]`}>
+            <div className={`grid h-full w-full gap-2 sm:gap-4 ${getGridClass()} max-h-full`}>
               {/* Local Tile */}
-              <div className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-xl flex items-center justify-center">
+              <div className="relative overflow-hidden rounded-xl sm:rounded-2xl border border-slate-800 bg-slate-900 shadow-xl flex items-center justify-center">
                 <video
                   ref={(el) => {
                     if (el && localStream && el.srcObject !== localStream) {
@@ -1338,19 +1335,19 @@ export default function RoomPage() {
                 />
                 {isVideoOff && (
                   <div className="flex flex-col items-center justify-center gap-2 text-slate-500">
-                    <VideoOff className="h-10 w-10" />
+                    <VideoOff className="h-8 w-8 sm:h-10 sm:w-10" />
                     <span className="text-xs">Camera Off</span>
                   </div>
                 )}
-                <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-full bg-slate-950/80 px-3 py-1 text-xs font-medium text-slate-200 backdrop-blur-md">
-                  <span>You ({userName})</span>
+                <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 flex items-center gap-1.5 rounded-full bg-slate-950/80 px-2.5 py-1 text-xs font-medium text-slate-200 backdrop-blur-md">
+                  <span className="truncate max-w-[100px] sm:max-w-none">You ({userName})</span>
                   {isAdmin && (
-                    <span className="flex items-center gap-1 rounded bg-amber-500/20 text-amber-300 px-1.5 py-0.5 text-[10px] font-bold border border-amber-500/30">
+                    <span className="flex items-center gap-0.5 sm:gap-1 rounded bg-amber-500/20 text-amber-300 px-1.5 py-0.5 text-[10px] font-bold border border-amber-500/30">
                       <Crown className="h-3 w-3" />
                       <span>Admin</span>
                     </span>
                   )}
-                  {isMuted && <MicOff className="h-3.5 w-3.5 text-red-400" />}
+                  {isMuted && <MicOff className="h-3.5 w-3.5 text-red-400 shrink-0" />}
                 </div>
               </div>
 
@@ -1364,7 +1361,7 @@ export default function RoomPage() {
                 return (
                   <div
                     key={peerId}
-                    className="relative overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-xl flex items-center justify-center"
+                    className="relative overflow-hidden rounded-xl sm:rounded-2xl border border-slate-800 bg-slate-900 shadow-xl flex items-center justify-center"
                   >
                     {stream ? (
                       <video
@@ -1381,19 +1378,19 @@ export default function RoomPage() {
                         className="h-full w-full object-cover"
                       />
                     ) : (
-                      <div className="flex flex-col items-center justify-center gap-3 text-slate-400">
-                        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 font-bold text-2xl">
+                      <div className="flex flex-col items-center justify-center gap-2 sm:gap-3 text-slate-400">
+                        <div className="flex h-14 w-14 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 font-bold text-xl sm:text-2xl">
                           {(name[0] || 'P').toUpperCase()}
                         </div>
-                        <span className="text-xs font-semibold text-slate-300">{name}</span>
-                        <span className="text-[11px] text-slate-500">Connecting video stream...</span>
+                        <span className="text-xs font-semibold text-slate-300 truncate max-w-[140px]">{name}</span>
+                        <span className="text-[10px] sm:text-[11px] text-slate-500">Connecting stream...</span>
                       </div>
                     )}
-                    <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-full bg-slate-950/80 px-3 py-1 text-xs font-medium text-slate-200 backdrop-blur-md">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-                      <span>{name}</span>
+                    <div className="absolute bottom-2 left-2 sm:bottom-3 sm:left-3 flex items-center gap-1.5 rounded-full bg-slate-950/80 px-2.5 py-1 text-xs font-medium text-slate-200 backdrop-blur-md">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0"></span>
+                      <span className="truncate max-w-[100px] sm:max-w-none">{name}</span>
                       {peerIsAdmin && (
-                        <span className="flex items-center gap-1 rounded bg-amber-500/20 text-amber-300 px-1.5 py-0.5 text-[10px] font-bold border border-amber-500/30">
+                        <span className="flex items-center gap-0.5 sm:gap-1 rounded bg-amber-500/20 text-amber-300 px-1.5 py-0.5 text-[10px] font-bold border border-amber-500/30 shrink-0">
                           <Crown className="h-3 w-3" />
                           <span>Admin</span>
                         </span>
@@ -1407,13 +1404,13 @@ export default function RoomPage() {
         </div>
 
         {/* Floating Call Controls Dock */}
-        <div className="flex h-20 items-center justify-center border-t border-slate-800/80 bg-slate-900/80 px-4 backdrop-blur-xl">
-          <div className="flex items-center gap-3 sm:gap-4">
+        <div className="flex h-16 sm:h-20 items-center justify-center border-t border-slate-800/80 bg-slate-900/90 px-2 sm:px-4 backdrop-blur-xl shrink-0">
+          <div className="flex items-center gap-2 sm:gap-4">
             {/* Audio Mute/Unmute */}
             <button
               type="button"
               onClick={toggleMute}
-              className={`flex h-12 w-12 flex-col items-center justify-center rounded-2xl transition-all shadow-md ${
+              className={`flex h-11 w-11 sm:h-12 sm:w-12 flex-col items-center justify-center rounded-xl sm:rounded-2xl transition-all shadow-md ${
                 isMuted
                   ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20'
                   : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
@@ -1427,7 +1424,7 @@ export default function RoomPage() {
             <button
               type="button"
               onClick={toggleVideo}
-              className={`flex h-12 w-12 flex-col items-center justify-center rounded-2xl transition-all shadow-md ${
+              className={`flex h-11 w-11 sm:h-12 sm:w-12 flex-col items-center justify-center rounded-xl sm:rounded-2xl transition-all shadow-md ${
                 isVideoOff
                   ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20'
                   : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
@@ -1437,12 +1434,12 @@ export default function RoomPage() {
               {isVideoOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
             </button>
 
-            {/* Screen Share */}
+            {/* Screen Share (Desktop only) */}
             <button
               type="button"
               disabled={!permissions.allowScreenShare}
               onClick={toggleScreenShare}
-              className={`flex h-12 w-12 flex-col items-center justify-center rounded-2xl transition-all shadow-md ${
+              className={`hidden sm:flex h-12 w-12 flex-col items-center justify-center rounded-2xl transition-all shadow-md ${
                 !permissions.allowScreenShare
                   ? 'bg-slate-800/50 text-slate-600 cursor-not-allowed opacity-50'
                   : isScreenSharing
@@ -1468,7 +1465,7 @@ export default function RoomPage() {
                 setIsChatOpen((prev) => !prev);
                 setUnreadCount(0);
               }}
-              className={`relative flex h-12 w-12 flex-col items-center justify-center rounded-2xl transition-all shadow-md ${
+              className={`relative flex h-11 w-11 sm:h-12 sm:w-12 flex-col items-center justify-center rounded-xl sm:rounded-2xl transition-all shadow-md ${
                 !permissions.allowChat
                   ? 'bg-slate-800/50 text-slate-600 cursor-not-allowed opacity-50'
                   : isChatOpen
@@ -1489,7 +1486,7 @@ export default function RoomPage() {
             <button
               type="button"
               onClick={handleLeaveCall}
-              className="flex h-12 items-center gap-2 rounded-2xl bg-red-600 px-5 text-xs font-bold text-white shadow-lg shadow-red-600/30 transition-all hover:bg-red-700 hover:scale-[1.02] active:scale-[0.98]"
+              className="flex h-11 sm:h-12 items-center gap-1.5 sm:gap-2 rounded-xl sm:rounded-2xl bg-red-600 px-3.5 sm:px-5 text-xs font-bold text-white shadow-lg shadow-red-600/30 transition-all hover:bg-red-700 hover:scale-[1.02] active:scale-[0.98]"
               title="Leave call"
             >
               <PhoneOff className="h-4 w-4" />
@@ -1499,11 +1496,11 @@ export default function RoomPage() {
         </div>
       </div>
 
-      {/* Right P2P Live Chat Sidebar */}
+      {/* Right P2P Live Chat (Full screen on mobile, sidebar on desktop) */}
       {isChatOpen && (
-        <div className="flex h-full w-80 sm:w-96 flex-col border-l border-slate-800/80 bg-slate-900/95 shadow-2xl backdrop-blur-xl">
+        <div className="fixed inset-0 z-50 flex flex-col bg-slate-950 sm:relative sm:inset-auto sm:z-auto sm:h-full sm:w-80 md:w-96 sm:border-l sm:border-slate-800/80 sm:bg-slate-900/95 sm:backdrop-blur-xl shadow-2xl">
           {/* Chat Header */}
-          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3.5">
+          <div className="flex items-center justify-between border-b border-slate-800 px-4 py-3 sm:py-3.5">
             <div className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4 text-indigo-400" />
               <h3 className="text-sm font-bold text-white">Live Room Chat</h3>
@@ -1511,15 +1508,15 @@ export default function RoomPage() {
             <button
               type="button"
               onClick={() => setIsChatOpen(false)}
-              className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white"
             >
-              <X className="h-4 w-4" />
+              <X className="h-5 w-5 sm:h-4 sm:w-4" />
             </button>
           </div>
 
           {/* Direct P2P Banner */}
-          <div className="flex items-center gap-2 bg-emerald-500/10 px-4 py-2 text-[11px] font-medium text-emerald-400 border-b border-emerald-500/20">
-            <Shield className="h-3.5 w-3.5" />
+          <div className="flex items-center gap-2 bg-emerald-500/10 px-4 py-2 text-[11px] font-medium text-emerald-400 border-b border-emerald-500/20 shrink-0">
+            <Shield className="h-3.5 w-3.5 shrink-0" />
             <span>P2P Encrypted • Zero Server Storage</span>
           </div>
 
@@ -1564,7 +1561,7 @@ export default function RoomPage() {
           </div>
 
           {/* Chat Input */}
-          <form onSubmit={handleSendMessage} className="border-t border-slate-800 p-3 bg-slate-950/60">
+          <form onSubmit={handleSendMessage} className="border-t border-slate-800 p-3 bg-slate-950/90 sm:bg-slate-950/60 shrink-0">
             <div className="flex gap-2">
               <input
                 type="text"
@@ -1572,12 +1569,12 @@ export default function RoomPage() {
                 disabled={!permissions.allowChat}
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder={permissions.allowChat ? 'Type your message...' : 'Chat disabled by admin'}
-                className="flex-1 rounded-xl border border-slate-700/80 bg-slate-900 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all disabled:opacity-50"
+                className="flex-1 rounded-xl border border-slate-700/80 bg-slate-900 px-3.5 py-2 text-base sm:text-xs text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all disabled:opacity-50"
               />
               <button
                 type="submit"
                 disabled={!chatInput.trim() || !permissions.allowChat}
-                className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-600/30 transition-all hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex h-9 w-9 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-600/30 transition-all hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
               >
                 <Send className="h-4 w-4" />
               </button>

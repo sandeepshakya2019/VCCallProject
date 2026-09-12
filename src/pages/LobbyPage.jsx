@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Video,
   VideoOff,
@@ -16,27 +16,27 @@ import {
   Sparkles,
   ExternalLink,
   Wifi,
-} from 'lucide-react';
-import { useRoomContext } from '../context/RoomContext';
-import { getBaseNetworkUrl, getNetworkIp } from '../utils/network';
+} from "lucide-react";
+import { useRoomContext } from "../context/RoomContext";
+import { getBaseNetworkUrl, getNetworkIp } from "../utils/network";
 
 export default function LobbyPage() {
   const navigate = useNavigate();
   const { rooms, getRoom } = useRoomContext();
 
-  const [roomNumberInput, setRoomNumberInput] = useState('');
+  const [roomNumberInput, setRoomNumberInput] = useState("");
   const [displayName, setDisplayName] = useState(() => {
-    return localStorage.getItem('vccall_display_name') || '';
+    return localStorage.getItem("vccall_display_name") || "";
   });
 
   // Local Media Preview State
   const [localStream, setLocalStream] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
-  const [mediaError, setMediaError] = useState('');
+  const [mediaError, setMediaError] = useState("");
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedIp, setCopiedIp] = useState(false);
-  const [formError, setFormError] = useState('');
+  const [formError, setFormError] = useState("");
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -55,8 +55,10 @@ export default function LobbyPage() {
           videoRef.current.srcObject = stream;
         }
       } catch (err) {
-        console.warn('Camera preview failed:', err);
-        setMediaError('Camera or Microphone not available. You can still enter the room to view others.');
+        console.warn("Camera preview failed:", err);
+        setMediaError(
+          "Camera or Microphone not available. You can still enter the room to view others.",
+        );
       }
     }
 
@@ -91,35 +93,37 @@ export default function LobbyPage() {
 
   const handleJoin = (e) => {
     e.preventDefault();
-    setFormError('');
+    setFormError("");
 
     const trimmedRoom = roomNumberInput.trim();
     if (!trimmedRoom) {
-      setFormError('Please enter a room number to join.');
+      setFormError("Please enter a room number to join.");
       return;
     }
 
     // Check if room exists in configured rooms and if it is locked
     const configuredRoom = getRoom(trimmedRoom);
     if (configuredRoom && configuredRoom.permissions?.isLocked) {
-      setFormError(`Room #${trimmedRoom} is locked by the admin. New participants cannot join.`);
+      setFormError(
+        `Room #${trimmedRoom} is locked by the admin. New participants cannot join.`,
+      );
       return;
     }
 
     const trimmedName = displayName.trim();
     if (!trimmedName) {
-      setFormError('Your name is required to join the room.');
+      setFormError("Your name is required to join the room.");
       return;
     }
 
-    localStorage.setItem('vccall_display_name', trimmedName);
+    localStorage.setItem("vccall_display_name", trimmedName);
 
     // Navigate to /room/:roomNumber
     navigate(`/room/${trimmedRoom}`);
   };
 
   const handleCopyQuickLink = (roomNum) => {
-    const num = roomNum || roomNumberInput.trim() || '101';
+    const num = roomNum || roomNumberInput.trim() || "101";
     const link = `${getBaseNetworkUrl()}/room/${num}`;
     navigator.clipboard.writeText(link);
     setCopiedLink(true);
@@ -134,43 +138,30 @@ export default function LobbyPage() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-4 py-8 sm:px-6 lg:px-8">
+    <div className="min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100dvh-4rem)] bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-3 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="mx-auto max-w-5xl">
         {/* Header Title */}
-        <div className="mb-8 text-center sm:mb-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-4 py-1 text-xs font-semibold text-indigo-400 mb-3 backdrop-blur-md">
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>Pure Peer-to-Peer Video Calling & Live Chat</span>
-          </div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-5xl">
-            Enter Room Number to Join
-          </h1>
-          <p className="mx-auto mt-2 max-w-xl text-sm text-slate-400">
-            Type your room number below. Anyone entering the same room number will instantly connect to the same video call.
-          </p>
-
-          {/* Prominent Network IP Banner */}
-          <div className="mx-auto mt-5 inline-flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-indigo-500/30 bg-slate-900/90 px-4 py-2.5 shadow-xl backdrop-blur-xl">
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2.5 w-2.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-              </span>
-              <Wifi className="h-4 w-4 text-emerald-400" />
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-300">Your Network IP:</span>
-              <code className="font-mono text-sm font-bold text-indigo-300">{getNetworkIp()}:5173</code>
-            </div>
-
+        <div className="mb-6 text-center sm:mb-10">
+          {/* <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-1.5 text-xs font-semibold text-indigo-300 mb-3 backdrop-blur-md">
+            <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <Wifi className="h-3.5 w-3.5 text-indigo-400" />
+            <span>Network IP: <strong className="font-mono text-white tracking-wide">{getNetworkIp()}</strong></span>
             <button
               type="button"
               onClick={handleCopyIp}
-              className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-1.5 text-xs font-bold text-white shadow-md shadow-indigo-600/30 hover:bg-indigo-500 transition-all hover:scale-[1.02] active:scale-[0.98]"
-              title="Copy Network IP URL to share with others on your Wi-Fi"
+              className="ml-1 rounded p-1 hover:bg-indigo-500/20 text-indigo-300 hover:text-white transition-colors"
+              title="Copy Network Portal Link"
             >
-              {copiedIp ? <Check className="h-3.5 w-3.5 text-emerald-300" /> : <Copy className="h-3.5 w-3.5" />}
-              <span>{copiedIp ? 'IP Copied!' : 'Copy IP URL'}</span>
+              {copiedIp ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
             </button>
-          </div>
+          </div> */}
+          <h1 className="text-2xl font-extrabold tracking-tight text-white sm:text-5xl">
+            Enter Room Number to Join
+          </h1>
+          <p className="mx-auto mt-2 max-w-xl text-xs sm:text-sm text-slate-400">
+            Connect directly with colleagues on your local network. Pure
+            peer-to-peer streaming with zero server recording.
+          </p>
         </div>
 
         {/* Media Warning if any */}
@@ -182,18 +173,20 @@ export default function LobbyPage() {
         )}
 
         {/* Join Box & Camera Preview Side-by-Side */}
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-12 items-start">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-12 md:gap-8 items-start">
           {/* Main Join Room Card (7 cols) */}
           <div className="md:col-span-7">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 sm:p-8 shadow-2xl backdrop-blur-xl">
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 sm:p-8 shadow-2xl backdrop-blur-xl">
               <div className="flex items-center justify-between border-b border-slate-800/80 pb-4">
                 <div>
-                  <h2 className="text-xl font-bold text-white">Join Call</h2>
+                  <h2 className="text-lg sm:text-xl font-bold text-white">
+                    Join Call
+                  </h2>
                   <p className="text-xs text-slate-400 mt-0.5">
                     Connect immediately using your room number
                   </p>
                 </div>
-                <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400 border border-emerald-500/20">
+                <span className="flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-0.5 sm:px-3 sm:py-1 text-xs font-semibold text-emerald-400 border border-emerald-500/20">
                   <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
                   Ready to Connect
                 </span>
@@ -209,7 +202,8 @@ export default function LobbyPage() {
                 {/* Room Number Input */}
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-300">
-                    Room Number / Room ID <span className="text-indigo-400">*</span>
+                    Room Number / Room ID{" "}
+                    <span className="text-indigo-400">*</span>
                   </label>
                   <div className="relative mt-2">
                     <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-indigo-400">
@@ -226,7 +220,23 @@ export default function LobbyPage() {
                     />
                   </div>
                   <span className="mt-1.5 block text-[11px] text-slate-400">
-                    Tip: Enter any number or code (e.g. <button type="button" onClick={() => setRoomNumberInput('101')} className="text-indigo-400 underline hover:text-indigo-300">101</button>, <button type="button" onClick={() => setRoomNumberInput('102')} className="text-indigo-400 underline hover:text-indigo-300">102</button>)
+                    Tip: Enter any number or code (e.g.{" "}
+                    <button
+                      type="button"
+                      onClick={() => setRoomNumberInput("101")}
+                      className="text-indigo-400 underline hover:text-indigo-300"
+                    >
+                      101
+                    </button>
+                    ,{" "}
+                    <button
+                      type="button"
+                      onClick={() => setRoomNumberInput("102")}
+                      className="text-indigo-400 underline hover:text-indigo-300"
+                    >
+                      102
+                    </button>
+                    )
                   </span>
                 </div>
 
@@ -245,7 +255,7 @@ export default function LobbyPage() {
                       placeholder="Enter your name (Required)"
                       value={displayName}
                       onChange={(e) => setDisplayName(e.target.value)}
-                      className="w-full rounded-xl border border-slate-700 bg-slate-950/80 py-3 pl-10 pr-4 text-sm font-medium text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+                      className="w-full rounded-xl border border-slate-700 bg-slate-950/80 py-3 pl-10 pr-4 text-base sm:text-sm font-medium text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                     />
                   </div>
                 </div>
@@ -255,7 +265,10 @@ export default function LobbyPage() {
                   type="submit"
                   className="group flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 py-4 text-sm font-extrabold text-white shadow-xl shadow-indigo-600/30 transition-all hover:scale-[1.01] hover:shadow-indigo-600/50 active:scale-[0.99]"
                 >
-                  <span>Connect to Room {roomNumberInput.trim() ? `#${roomNumberInput.trim()}` : ''}</span>
+                  <span>
+                    Connect to Room{" "}
+                    {roomNumberInput.trim() ? `#${roomNumberInput.trim()}` : ""}
+                  </span>
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </button>
               </form>
@@ -275,8 +288,12 @@ export default function LobbyPage() {
                       onClick={() => handleCopyQuickLink()}
                       className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-700 transition-colors flex-shrink-0"
                     >
-                      {copiedLink ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-                      <span>{copiedLink ? 'Copied' : 'Copy'}</span>
+                      {copiedLink ? (
+                        <Check className="h-3.5 w-3.5 text-emerald-400" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                      <span>{copiedLink ? "Copied" : "Copy"}</span>
                     </button>
                   </div>
                 </div>
@@ -293,7 +310,7 @@ export default function LobbyPage() {
                   autoPlay
                   playsInline
                   muted
-                  className={`h-full w-full object-cover -scale-x-100 ${isVideoOff ? 'hidden' : ''}`}
+                  className={`h-full w-full object-cover -scale-x-100 ${isVideoOff ? "hidden" : ""}`}
                 />
 
                 {isVideoOff && (
@@ -309,22 +326,34 @@ export default function LobbyPage() {
                     type="button"
                     onClick={toggleMic}
                     className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
-                      isMuted ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                      isMuted
+                        ? "bg-red-500 text-white"
+                        : "bg-slate-800 text-slate-200 hover:bg-slate-700"
                     }`}
-                    title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
+                    title={isMuted ? "Unmute microphone" : "Mute microphone"}
                   >
-                    {isMuted ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                    {isMuted ? (
+                      <MicOff className="h-4 w-4" />
+                    ) : (
+                      <Mic className="h-4 w-4" />
+                    )}
                   </button>
 
                   <button
                     type="button"
                     onClick={toggleVideo}
                     className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
-                      isVideoOff ? 'bg-red-500 text-white' : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                      isVideoOff
+                        ? "bg-red-500 text-white"
+                        : "bg-slate-800 text-slate-200 hover:bg-slate-700"
                     }`}
-                    title={isVideoOff ? 'Turn camera on' : 'Turn camera off'}
+                    title={isVideoOff ? "Turn camera on" : "Turn camera off"}
                   >
-                    {isVideoOff ? <VideoOff className="h-4 w-4" /> : <Video className="h-4 w-4" />}
+                    {isVideoOff ? (
+                      <VideoOff className="h-4 w-4" />
+                    ) : (
+                      <Video className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
               </div>
@@ -338,18 +367,40 @@ export default function LobbyPage() {
               </div>
             </div>
 
-            {/* Network / LAN info card */}
-            <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-400 space-y-2">
+            {/* Share Meeting Portal Card */}
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-4 text-xs text-slate-400 space-y-3 shadow-lg">
               <div className="flex items-center justify-between font-semibold text-slate-200">
                 <div className="flex items-center gap-2">
                   <Wifi className="h-4 w-4 text-indigo-400" />
-                  <span>Network IP Access</span>
+                  <span>Network Connection</span>
                 </div>
-                <span className="font-mono text-xs text-indigo-300">{getNetworkIp()}</span>
+                <span className="flex items-center gap-1 text-[11px] text-emerald-400 font-medium">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                  LAN Mesh Online
+                </span>
               </div>
-              <p className="text-[11px] leading-relaxed">
-                Connect directly using: <code className="text-indigo-300 font-mono font-bold">{getBaseNetworkUrl()}</code>. Anyone on your local network/Wi-Fi can enter your room number and connect!
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                Connect your mobile phone or other devices on this Wi-Fi network
+                using:
               </p>
+              <div className="flex items-center justify-between gap-2 rounded-xl bg-slate-950 border border-slate-800 p-2.5">
+                <code className="text-xs font-mono font-bold text-indigo-300 truncate">
+                  {getBaseNetworkUrl()}
+                </code>
+                <button
+                  type="button"
+                  onClick={handleCopyIp}
+                  className="flex items-center gap-1.5 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition-colors shrink-0"
+                  title="Copy Link"
+                >
+                  {copiedIp ? (
+                    <Check className="h-3.5 w-3.5 text-emerald-400" />
+                  ) : (
+                    <Copy className="h-3.5 w-3.5 text-indigo-400" />
+                  )}
+                  <span>{copiedIp ? "Copied" : "Copy"}</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -360,10 +411,12 @@ export default function LobbyPage() {
             <div className="flex items-center gap-2">
               <Users className="h-4 w-4 text-indigo-400" />
               <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">
-                Existing Configured Rooms
+                Configured Rooms
               </h3>
             </div>
-            <span className="text-xs text-slate-500">{rooms.length} room(s) available</span>
+            <span className="text-xs text-slate-500">
+              {rooms.length} room(s) available
+            </span>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -389,7 +442,8 @@ export default function LobbyPage() {
                       </span>
                     ) : (
                       <span className="flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-medium text-emerald-400 border border-emerald-500/20">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Open
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>{" "}
+                        Open
                       </span>
                     )}
                   </div>
