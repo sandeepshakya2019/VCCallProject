@@ -25,6 +25,14 @@ import {
   Wifi,
   Crown,
   KeyRound,
+  Pin,
+  PinOff,
+  Maximize2,
+  Minimize2,
+  Volume2,
+  VolumeX,
+  Timer,
+  Keyboard,
 } from 'lucide-react';
 import { useRoomContext } from '../context/RoomContext';
 import { getBaseNetworkUrl } from '../utils/network';
@@ -33,7 +41,7 @@ import { createSyntheticStream } from '../utils/mediaFallback';
 export default function RoomPage() {
   const { roomNumber } = useParams();
   const navigate = useNavigate();
-  const { getRoom, deletedRoomNotification, loginAdmin, isRoomsLoaded } = useRoomContext();
+  const { getRoom, deletedRoomNotification, loginAdmin, isRoomsLoaded, setIsInCall } = useRoomContext();
 
   // Name & Join status
   const [userName, setUserName] = useState(() => localStorage.getItem('vccall_display_name') || '');
@@ -79,6 +87,18 @@ export default function RoomPage() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  // --- Phase 1: Layout, Spotlight, Active Speaker, Timer, PiP, Fullscreen, Sounds ---
+  const [pinnedId, setPinnedId] = useState(null);       // 'local' | peerId | null
+  const [activeSpeakers, setActiveSpeakers] = useState(new Set());
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [currentTime, setCurrentTime] = useState('');
+  const [elapsedTime, setElapsedTime] = useState('');
+  const [milestoneToast, setMilestoneToast] = useState(null);
+  const [isPipVisible, setIsPipVisible] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const [isSpeakerMuted, setIsSpeakerMuted] = useState(false);
+
   // Refs
   const peerRef = useRef(null);
   const localStreamRef = useRef(null);
@@ -91,6 +111,15 @@ export default function RoomPage() {
   const myPeerIdRef = useRef('');
   const userNameRef = useRef('');
   const isAdminRef = useRef(false);
+  // Phase 1 refs
+  const analyserNodesRef = useRef({});   // { 'local': AnalyserNode, [peerId]: AnalyserNode }
+  const audioCtxRef = useRef(null);
+  const speakerTimersRef = useRef({});   // debounce timers per speaker id
+  const joinedAtRef = useRef(null);
+  const lastMilestoneRef = useRef(0);
+  const callContainerRef = useRef(null); // for fullscreen
+  const pinnedIdRef = useRef(null);      // mirror for callbacks
+
 
   useEffect(() => {
     myPeerIdRef.current = myPeerId;
@@ -104,12 +133,227 @@ export default function RoomPage() {
     isAdminRef.current = isAdmin;
   }, [isAdmin]);
 
+  useEffect(() => {
+    pinnedIdRef.current = pinnedId;
+  }, [pinnedId]);
+
+  // Sync with AppLayout to hide top navigation bar during active call
+  useEffect(() => {
+    if (setIsInCall) {
+      setIsInCall(isJoined);
+    }
+    return () => {
+      if (setIsInCall) {
+        setIsInCall(false);
+      }
+    };
+  }, [isJoined, setIsInCall]);
+
+  // ─── Helper: Broadcast to all open data connections ───────────────────────
+  const broadcastData = (payload) => {
+    Object.values(dataConnsRef.current).forEach((conn) => {
+      if (conn.open) conn.send(payload);
+    });
+  };
+
+  // ─── Helper: Play synthesized notification sounds ─────────────────────────
+  const playSound = (type) => {
+    if (!soundEnabled) return;
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const masterGain = ctx.createGain();
+      masterGain.connect(ctx.destination);
+      masterGain.gain.setValueAtTime(0.28, ctx.currentTime);
+
+      const beep = (freq, start, duration, wave = 'sine') => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = wave;
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+        g.gain.setValueAtTime(0, ctx.currentTime + start);
+        g.gain.linearRampToValueAtTime(1, ctx.currentTime + start + 0.02);
+        g.gain.linearRampToValueAtTime(0, ctx.currentTime + start + duration);
+        osc.connect(g);
+        g.connect(masterGain);
+        osc.start(ctx.currentTime + start);
+        osc.stop(ctx.currentTime + start + duration + 0.05);
+      };
+
+      const sounds = {
+        join:         () => { beep(523, 0, 0.15); beep(659, 0.16, 0.2); },
+        leave:        () => { beep(659, 0, 0.15); beep(523, 0.16, 0.2); },
+        knock:        () => { beep(440, 0, 0.08, 'triangle'); beep(440, 0.1, 0.08, 'triangle'); beep(440, 0.2, 0.08, 'triangle'); },
+        admitted:     () => { beep(523, 0, 0.12); beep(659, 0.13, 0.12); beep(784, 0.26, 0.2); },
+        denied:       () => { beep(300, 0, 0.15); beep(200, 0.16, 0.22); },
+        admin_action: () => { beep(220, 0, 0.15); },
+        milestone:    () => { beep(880, 0, 0.08); beep(1047, 0.1, 0.15); },
+        request:      () => { beep(880, 0, 0.1); beep(660, 0.12, 0.15); },
+      };
+
+      if (sounds[type]) sounds[type]();
+      setTimeout(() => ctx.close(), 2000);
+    } catch (e) { /* no audio support */ }
+  };
+
+  // ─── Active Speaker Detection ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!isJoined) return;
+    const SPEAK_THRESHOLD = 18;
+    const SILENCE_DEBOUNCE = 600;
+
+    const ensureAudioCtx = () => {
+      if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+        audioCtxRef.current = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      return audioCtxRef.current;
+    };
+
+    const connectStream = (id, stream) => {
+      if (!stream || analyserNodesRef.current[id]) return;
+      try {
+        const ctx = ensureAudioCtx();
+        const source = ctx.createMediaStreamSource(stream);
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        analyserNodesRef.current[id] = analyser;
+      } catch (e) { /* ignore */ }
+    };
+
+    // Connect local stream
+    if (localStreamRef.current) connectStream('local', localStreamRef.current);
+
+    // Connect all remote streams
+    Object.entries(participants).forEach(([peerId, info]) => {
+      if (info.stream) connectStream(peerId, info.stream);
+    });
+
+    const pollInterval = setInterval(() => {
+      const data = new Uint8Array(64);
+      const now = Date.now();
+
+      Object.entries(analyserNodesRef.current).forEach(([id, analyser]) => {
+        try {
+          analyser.getByteFrequencyData(data);
+          const avg = data.reduce((s, v) => s + v, 0) / data.length;
+          const isSpeaking = avg > SPEAK_THRESHOLD;
+
+          // Skip local if muted
+          if (id === 'local' && isMuted) return;
+
+          if (isSpeaking) {
+            clearTimeout(speakerTimersRef.current[id]);
+            delete speakerTimersRef.current[id];
+            setActiveSpeakers(prev => {
+              if (prev.has(id)) return prev;
+              const next = new Set(prev);
+              next.add(id);
+              return next;
+            });
+          } else {
+            if (!speakerTimersRef.current[id]) {
+              speakerTimersRef.current[id] = setTimeout(() => {
+                setActiveSpeakers(prev => {
+                  const next = new Set(prev);
+                  next.delete(id);
+                  return next;
+                });
+                delete speakerTimersRef.current[id];
+              }, SILENCE_DEBOUNCE);
+            }
+          }
+        } catch (e) { /* analyser may be disconnected */ }
+      });
+    }, 80);
+
+    return () => {
+      clearInterval(pollInterval);
+      Object.values(speakerTimersRef.current).forEach(t => clearTimeout(t));
+      speakerTimersRef.current = {};
+    };
+  }, [isJoined, participants, isMuted]);
+
+  // ─── Clock + Progressive Meeting Timer ───────────────────────────────────
+  useEffect(() => {
+    if (!isJoined) return;
+    joinedAtRef.current = Date.now();
+    lastMilestoneRef.current = 0;
+    // Only notify every 10 minutes (10, 20, 30, 40, 50, 60 min, etc.)
+    const MILESTONES = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180];
+
+    const tick = () => {
+      const elapsed = Date.now() - joinedAtRef.current;
+      const totalMinutes = Math.floor(elapsed / 60000);
+      const h = Math.floor(elapsed / 3600000);
+      const m = Math.floor((elapsed % 3600000) / 60000).toString().padStart(2, '0');
+      const s = Math.floor((elapsed % 60000) / 1000).toString().padStart(2, '0');
+
+      setCurrentTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
+      setElapsedTime(h > 0 ? `${h}:${m}:${s}` : `${m}:${s}`);
+
+      const nextMs = MILESTONES.find(ms => ms > lastMilestoneRef.current && totalMinutes >= ms);
+      if (nextMs) {
+        lastMilestoneRef.current = nextMs;
+        let label = '';
+        if (nextMs % 60 === 0) {
+          const hrs = nextMs / 60;
+          label = `${hrs} hour${hrs > 1 ? 's' : ''} completed 🎉`;
+        } else if (nextMs > 60) {
+          const hrs = Math.floor(nextMs / 60);
+          const remMin = nextMs % 60;
+          label = `${hrs} hr ${remMin} mins completed`;
+        } else {
+          label = `${nextMs} minutes completed`;
+        }
+
+        setMilestoneToast(`⏱ ${label}`);
+        playSound('milestone');
+        setTimeout(() => setMilestoneToast(null), 4000);
+      }
+    };
+
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [isJoined]);
+
+  // ─── Fullscreen change listener ───────────────────────────────────────────
+  useEffect(() => {
+    const handler = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    document.addEventListener('fullscreenchange', handler);
+    return () => document.removeEventListener('fullscreenchange', handler);
+  }, []);
+
+  // ─── Keyboard Shortcuts ───────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isJoined) return;
+    const handler = (e) => {
+      const tag = document.activeElement?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      switch (e.key.toLowerCase()) {
+        case 'm': toggleMute(); break;
+        case 'o': toggleSpeakerMute(); break;
+        case 'v': toggleVideo(); break;
+        case 'c': setIsChatOpen(p => !p); break;
+        case 'f': toggleFullscreen(); break;
+        case '?': setIsShortcutsModalOpen(p => !p); break;
+        case 'escape':
+          setPinnedId(null);
+          setIsShortcutsModalOpen(false);
+          break;
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isJoined]);
+
   // Auto-scroll chat
   useEffect(() => {
     if (isChatOpen) {
       chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isChatOpen]);
+
 
   // Listen for admin room deletion
   useEffect(() => {
@@ -349,6 +593,7 @@ export default function RoomPage() {
               // Only active room admin receives this notification
               if (isAdminRef.current) {
                 console.log('[Admin] Received knock request from:', data.name, data.peerId);
+                playSound('knock');
                 setPendingKnocks((prev) => {
                   if (prev.some((k) => k.peerId === data.peerId)) return prev;
                   return [...prev, { peerId: data.peerId, name: data.name }];
@@ -509,6 +754,7 @@ export default function RoomPage() {
             name: data.name,
             isAdmin: Boolean(data.isAdmin),
           });
+          playSound('join');
           setParticipants((prev) => ({
             ...prev,
             [conn.peer]: {
@@ -518,6 +764,12 @@ export default function RoomPage() {
               isConnected: true,
             },
           }));
+        } else if (data.type === 'SCREEN_SHARE_START') {
+          // Remote peer started screen share — auto-spotlight them
+          setPinnedId(conn.peer);
+        } else if (data.type === 'SCREEN_SHARE_STOP') {
+          // Remote peer stopped screen share — unpin if they were spotlighted
+          setPinnedId(prev => prev === conn.peer ? null : prev);
         }
       });
 
@@ -550,6 +802,12 @@ export default function RoomPage() {
         }
       }
       peerNamesMap.delete(peerId);
+      // Reset pinned spotlight if this peer was pinned
+      setPinnedId(prev => prev === peerId ? null : prev);
+      // Cleanup analyser node for this peer
+      delete analyserNodesRef.current[peerId];
+      // Play leave sound
+      playSound('leave');
       setParticipants((prev) => {
         const updated = { ...prev };
         delete updated[peerId];
@@ -773,7 +1031,7 @@ export default function RoomPage() {
     startKnocking(trimmed);
   };
 
-  // Media Actions: Mute
+  // Media Actions: Mute Microphone
   const toggleMute = () => {
     if (!localStreamRef.current) return;
     const audioTrack = localStreamRef.current.getAudioTracks()[0];
@@ -781,6 +1039,11 @@ export default function RoomPage() {
       audioTrack.enabled = !audioTrack.enabled;
       setIsMuted(!audioTrack.enabled);
     }
+  };
+
+  // Media Actions: Mute Incoming Speaker Audio (Output Sound)
+  const toggleSpeakerMute = () => {
+    setIsSpeakerMuted(prev => !prev);
   };
 
   // Media Actions: Camera On/Off
@@ -822,6 +1085,8 @@ export default function RoomPage() {
         };
 
         setIsScreenSharing(true);
+        setPinnedId('local');
+        broadcastData({ type: 'SCREEN_SHARE_START', senderPeerId: myPeerIdRef.current });
       } catch (err) {
         console.warn('Screen share canceled or failed:', err);
       }
@@ -846,7 +1111,18 @@ export default function RoomPage() {
         });
       }
     }
+    broadcastData({ type: 'SCREEN_SHARE_STOP', senderPeerId: myPeerIdRef.current });
+    setPinnedId(prev => prev === 'local' ? null : prev);
     setIsScreenSharing(false);
+  };
+
+  // Fullscreen toggle
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      callContainerRef.current?.requestFullscreen().catch(() => {});
+    } else {
+      document.exitFullscreen().catch(() => {});
+    }
   };
 
   // Chat Actions
@@ -1189,7 +1465,7 @@ export default function RoomPage() {
   };
 
   return (
-    <div className="relative flex h-[calc(100dvh-3.5rem)] sm:h-[calc(100dvh-4rem)] w-full overflow-hidden bg-slate-950">
+    <div ref={callContainerRef} className="relative flex h-[100dvh] w-full overflow-hidden bg-slate-950">
       {/* Main Video Stage */}
       <div className="flex flex-1 flex-col overflow-hidden">
         {/* Top Room Header Bar */}
@@ -1221,15 +1497,70 @@ export default function RoomPage() {
             )}
           </div>
 
-          {/* Center/Right: Copy Link */}
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Center: Clock & Progressive Timer */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 rounded-full bg-slate-800/80 px-2.5 py-1 text-xs border border-slate-700/60 shadow-inner">
+            <span className="hidden md:inline font-mono font-medium text-slate-300">{currentTime}</span>
+            <span className="hidden md:inline text-slate-500">•</span>
+            <div className="flex items-center gap-1">
+              <Timer className="h-3 w-3 text-indigo-400 shrink-0" />
+              <span className={`font-mono font-bold ${
+                elapsedTime.startsWith('2:') || (elapsedTime.includes(':') && parseInt(elapsedTime.split(':')[0], 10) >= 120)
+                  ? 'text-rose-400 animate-pulse'
+                  : elapsedTime.startsWith('1:') || (elapsedTime.includes(':') && parseInt(elapsedTime.split(':')[0], 10) >= 60)
+                  ? 'text-orange-400'
+                  : parseInt(elapsedTime.split(':')[0], 10) >= 30
+                  ? 'text-amber-400'
+                  : 'text-slate-200'
+              }`}>
+                {elapsedTime || '00:00'}
+              </span>
+            </div>
+          </div>
+
+          {/* Right: Sound toggle, Fullscreen, Copy Link */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Keyboard Shortcuts Info Button */}
+            <button
+              type="button"
+              onClick={() => setIsShortcutsModalOpen(p => !p)}
+              className="hidden sm:flex p-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors shadow-sm"
+              title="Keyboard Shortcuts (?)"
+            >
+              <Keyboard className="h-3.5 w-3.5 text-indigo-400" />
+            </button>
+
+            {/* Sound toggle button */}
+            <button
+              type="button"
+              onClick={() => setSoundEnabled(p => !p)}
+              className={`p-1.5 rounded-lg border transition-colors shadow-sm ${
+                soundEnabled
+                  ? 'border-slate-700 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700'
+                  : 'border-red-500/40 bg-red-500/10 text-red-400 hover:bg-red-500/20'
+              }`}
+              title={soundEnabled ? 'Mute notification sounds' : 'Enable notification sounds'}
+            >
+              {soundEnabled ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+            </button>
+
+            {/* Fullscreen button (hidden on mobile) */}
+            <button
+              type="button"
+              onClick={toggleFullscreen}
+              className="hidden sm:flex p-1.5 rounded-lg border border-slate-700 bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 transition-colors shadow-sm"
+              title={isFullscreen ? 'Exit Fullscreen (F)' : 'Enter Fullscreen (F)'}
+            >
+              {isFullscreen ? <Minimize2 className="h-3.5 w-3.5 text-indigo-400" /> : <Maximize2 className="h-3.5 w-3.5 text-indigo-400" />}
+            </button>
+
+            {/* Copy Invite Link */}
             <button
               type="button"
               onClick={handleCopyInviteLink}
-              className="flex items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-800 px-2.5 py-1.5 sm:px-3.5 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700 hover:text-white shadow-sm"
+              className="flex items-center gap-1.5 rounded-lg border border-slate-700/80 bg-slate-800 px-2.5 py-1.5 sm:px-3 text-xs font-semibold text-slate-200 transition-colors hover:bg-slate-700 hover:text-white shadow-sm"
             >
               {copiedLink ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5 text-indigo-400" />}
-              <span className="hidden sm:inline">{copiedLink ? 'Link Copied!' : 'Copy Invite Link'}</span>
+              <span className="hidden sm:inline">{copiedLink ? 'Link Copied!' : 'Copy Link'}</span>
               <span className="sm:hidden">{copiedLink ? 'Copied' : 'Invite'}</span>
             </button>
           </div>
@@ -1273,11 +1604,25 @@ export default function RoomPage() {
           </div>
         )}
 
-        {/* Video Grid Area */}
+        {/* Progressive Meeting Milestone Toast */}
+        {milestoneToast && (
+          <div className="absolute top-14 left-1/2 -translate-x-1/2 z-40 pointer-events-none transition-all duration-300 animate-in fade-in zoom-in-95">
+            <div className="flex items-center gap-2 rounded-full border border-amber-500/40 bg-slate-900/95 px-4 py-1.5 text-xs font-bold text-amber-300 shadow-2xl backdrop-blur-md">
+              <Timer className="h-3.5 w-3.5 text-amber-400 shrink-0 animate-spin" />
+              <span>{milestoneToast}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Video Stage Area (Grid vs Spotlight) */}
         <div className="relative flex-1 p-2 sm:p-4 overflow-hidden flex items-center justify-center min-h-0">
           {participantIds.length === 0 ? (
             /* Single User Waiting State */
-            <div className="relative h-full w-full max-w-4xl max-h-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl flex items-center justify-center">
+            <div className={`relative h-full w-full max-w-4xl max-h-full overflow-hidden rounded-2xl border bg-slate-900 shadow-2xl flex items-center justify-center transition-all duration-300 ${
+              activeSpeakers.has('local')
+                ? 'border-emerald-500 ring-2 ring-emerald-400 shadow-[0_0_20px_rgba(52,211,153,0.35)]'
+                : 'border-slate-800'
+            }`}>
               <video
                 ref={(el) => {
                   if (el && localStream && el.srcObject !== localStream) {
@@ -1317,11 +1662,259 @@ export default function RoomPage() {
                 {isMuted && <MicOff className="h-3.5 w-3.5 text-red-400 shrink-0" />}
               </div>
             </div>
+          ) : pinnedId !== null ? (
+            /* SPOTLIGHT LAYOUT (Google Meet Style) */
+            <div className="relative flex flex-col sm:flex-row h-full w-full gap-2 sm:gap-3 overflow-hidden">
+              {/* Main Stage (Pinned Participant) */}
+              <div className="relative flex-1 h-full w-full overflow-hidden rounded-2xl border border-indigo-500/30 bg-slate-900 shadow-2xl flex items-center justify-center min-h-0">
+                {pinnedId === 'local' ? (
+                  /* Local user pinned (Camera or Screen Share) */
+                  <>
+                    <video
+                      ref={(el) => {
+                        if (el) {
+                          if (isScreenSharing && screenTrackRef.current) {
+                            const stream = new MediaStream([screenTrackRef.current]);
+                            if (el.srcObject !== stream) el.srcObject = stream;
+                          } else if (localStream && el.srcObject !== localStream) {
+                            el.srcObject = localStream;
+                          }
+                        }
+                      }}
+                      autoPlay
+                      playsInline
+                      muted
+                      className={`h-full w-full ${isScreenSharing ? 'object-contain bg-black' : 'object-cover -scale-x-100'} ${isVideoOff && !isScreenSharing ? 'hidden' : ''}`}
+                    />
+                    {isVideoOff && !isScreenSharing && (
+                      <div className="flex flex-col items-center justify-center gap-2 text-slate-500">
+                        <VideoOff className="h-10 w-10 sm:h-12 sm:w-12" />
+                        <span className="text-sm">Camera Off</span>
+                      </div>
+                    )}
+                    {/* Active Speaker Ring on Spotlight */}
+                    {activeSpeakers.has('local') && (
+                      <div className="pointer-events-none absolute inset-0 rounded-2xl ring-4 ring-emerald-400/80 shadow-[inset_0_0_20px_rgba(52,211,153,0.3)] animate-pulse" />
+                    )}
+                    <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-slate-950/85 px-3 py-1.5 text-xs font-medium text-slate-200 backdrop-blur-md border border-slate-800">
+                      <span>{isScreenSharing ? 'Your Screen' : `You (${userName})`}</span>
+                      {isAdmin && (
+                        <span className="flex items-center gap-0.5 rounded bg-amber-500/20 text-amber-300 px-1.5 py-0.5 text-[10px] font-bold border border-amber-500/30">
+                          <Crown className="h-3 w-3" />
+                          <span>Admin</span>
+                        </span>
+                      )}
+                      {isMuted && <MicOff className="h-3.5 w-3.5 text-red-400 shrink-0" />}
+                    </div>
+                  </>
+                ) : (
+                  /* Remote peer pinned */
+                  (() => {
+                    const peerInfo = participants[pinnedId];
+                    const stream = peerInfo?.stream;
+                    const name = peerInfo?.name || `Peer (${pinnedId.substring(0, 8)})`;
+                    const peerIsAdmin = Boolean(peerInfo?.isAdmin);
+
+                    return (
+                      <>
+                        {stream ? (
+                          <video
+                            ref={(el) => {
+                              if (el && stream) {
+                                if (el.srcObject !== stream) el.srcObject = stream;
+                                el.play().catch(() => {});
+                              }
+                            }}
+                            autoPlay
+                            playsInline
+                            muted={isSpeakerMuted}
+                            className="h-full w-full object-contain bg-black"
+                          />
+                        ) : (
+                          <div className="flex flex-col items-center justify-center gap-3 text-slate-400">
+                            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 font-bold text-2xl">
+                              {(name[0] || 'P').toUpperCase()}
+                            </div>
+                            <span className="text-sm font-semibold text-slate-300">{name}</span>
+                          </div>
+                        )}
+                        {/* Active Speaker Ring on Spotlight */}
+                        {activeSpeakers.has(pinnedId) && (
+                          <div className="pointer-events-none absolute inset-0 rounded-2xl ring-4 ring-emerald-400/80 shadow-[inset_0_0_20px_rgba(52,211,153,0.3)] animate-pulse" />
+                        )}
+                        <div className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full bg-slate-950/85 px-3 py-1.5 text-xs font-medium text-slate-200 backdrop-blur-md border border-slate-800">
+                          <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0"></span>
+                          <span>{name}</span>
+                          {peerIsAdmin && (
+                            <span className="flex items-center gap-0.5 rounded bg-amber-500/20 text-amber-300 px-1.5 py-0.5 text-[10px] font-bold border border-amber-500/30 shrink-0">
+                              <Crown className="h-3 w-3" />
+                              <span>Admin</span>
+                            </span>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()
+                )}
+
+                {/* Unpin Button Overlay */}
+                <button
+                  type="button"
+                  onClick={() => setPinnedId(null)}
+                  className="absolute top-3 right-3 flex items-center gap-1 rounded-lg border border-slate-700 bg-slate-900/90 px-2.5 py-1.5 text-xs font-semibold text-slate-200 backdrop-blur-md shadow-lg hover:bg-slate-800 hover:text-white transition-all active:scale-95"
+                  title="Unpin (Return to grid view)"
+                >
+                  <PinOff className="h-3.5 w-3.5 text-indigo-400" />
+                  <span className="hidden sm:inline">Unpin</span>
+                </button>
+              </div>
+
+              {/* Side/Bottom Thumbnail Strip (All other participants) */}
+              <div className="flex sm:flex-col gap-2 overflow-x-auto sm:overflow-y-auto sm:w-44 md:w-52 shrink-0 py-1 sm:py-0">
+                {/* Local user tile (if not the one pinned) */}
+                {pinnedId !== 'local' && (
+                  <div
+                    onClick={() => setPinnedId('local')}
+                    className={`group relative h-24 sm:h-32 w-36 sm:w-full shrink-0 cursor-pointer overflow-hidden rounded-xl border bg-slate-900 shadow-md transition-all hover:border-indigo-500/70 hover:scale-[1.02] ${
+                      activeSpeakers.has('local')
+                        ? 'border-emerald-400 ring-2 ring-emerald-400/80 shadow-[0_0_12px_rgba(52,211,153,0.35)]'
+                        : 'border-slate-800'
+                    }`}
+                  >
+                    <video
+                      ref={(el) => {
+                        if (el && localStream && el.srcObject !== localStream) {
+                          el.srcObject = localStream;
+                        }
+                      }}
+                      autoPlay
+                      playsInline
+                      muted
+                      className={`h-full w-full object-cover -scale-x-100 ${isVideoOff ? 'hidden' : ''}`}
+                    />
+                    {isVideoOff && (
+                      <div className="flex h-full w-full items-center justify-center bg-slate-950 text-slate-500">
+                        <VideoOff className="h-6 w-6" />
+                      </div>
+                    )}
+                    <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between rounded-md bg-slate-950/80 px-2 py-0.5 text-[10px] font-medium text-slate-200 backdrop-blur-sm">
+                      <span className="truncate max-w-[80px]">You</span>
+                      {isMuted && <MicOff className="h-3 w-3 text-red-400 shrink-0" />}
+                    </div>
+                    {/* Hover Pin Icon */}
+                    <div className="absolute inset-0 bg-indigo-950/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                      <div className="rounded-full bg-slate-900/90 p-1.5 border border-indigo-500/40 shadow-lg">
+                        <Pin className="h-3.5 w-3.5 text-indigo-400" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Remote peer thumbnail tiles */}
+                {participantIds
+                  .filter((pId) => pId !== pinnedId)
+                  .map((peerId) => {
+                    const peerInfo = participants[peerId];
+                    const stream = peerInfo?.stream;
+                    const name = peerInfo?.name || `Peer (${peerId.substring(0, 8)})`;
+                    const isSpeaking = activeSpeakers.has(peerId);
+
+                    return (
+                      <div
+                        key={peerId}
+                        onClick={() => setPinnedId(peerId)}
+                        className={`group relative h-24 sm:h-32 w-36 sm:w-full shrink-0 cursor-pointer overflow-hidden rounded-xl border bg-slate-900 shadow-md transition-all hover:border-indigo-500/70 hover:scale-[1.02] ${
+                          isSpeaking
+                            ? 'border-emerald-400 ring-2 ring-emerald-400/80 shadow-[0_0_12px_rgba(52,211,153,0.35)]'
+                            : 'border-slate-800'
+                        }`}
+                      >
+                        {stream ? (
+                          <video
+                            ref={(el) => {
+                              if (el && stream) {
+                                if (el.srcObject !== stream) el.srcObject = stream;
+                                el.play().catch(() => {});
+                              }
+                            }}
+                            autoPlay
+                            playsInline
+                            muted={isSpeakerMuted}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-slate-950 text-slate-500">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-600/20 text-indigo-400 text-xs font-bold border border-indigo-500/30">
+                              {(name[0] || 'P').toUpperCase()}
+                            </div>
+                          </div>
+                        )}
+                        <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between rounded-md bg-slate-950/80 px-2 py-0.5 text-[10px] font-medium text-slate-200 backdrop-blur-sm">
+                          <span className="truncate max-w-[80px]">{name}</span>
+                          {peerInfo?.isAdmin && <Crown className="h-3 w-3 text-amber-400 shrink-0" />}
+                        </div>
+                        {/* Hover Pin Icon */}
+                        <div className="absolute inset-0 bg-indigo-950/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                          <div className="rounded-full bg-slate-900/90 p-1.5 border border-indigo-500/40 shadow-lg">
+                            <Pin className="h-3.5 w-3.5 text-indigo-400" />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              {/* Floating Self-Preview (PiP) when another participant is pinned */}
+              {isPipVisible && pinnedId !== 'local' && (
+                <div className="hidden sm:block absolute bottom-3 right-3 z-30 group overflow-hidden rounded-xl border border-indigo-500/40 bg-slate-950 shadow-2xl transition-all hover:border-indigo-400 w-36 h-24">
+                  <video
+                    ref={(el) => {
+                      if (el && localStream && el.srcObject !== localStream) {
+                        el.srcObject = localStream;
+                      }
+                    }}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`h-full w-full object-cover -scale-x-100 ${isVideoOff ? 'hidden' : ''}`}
+                  />
+                  {isVideoOff && (
+                    <div className="flex h-full w-full items-center justify-center bg-slate-950 text-slate-500">
+                      <VideoOff className="h-6 w-6" />
+                    </div>
+                  )}
+                  <div className="absolute bottom-1 left-1 right-1 flex items-center justify-between rounded bg-slate-950/80 px-1.5 py-0.5 text-[10px] text-slate-200">
+                    <span className="truncate">You (PiP)</span>
+                    {isMuted && <MicOff className="h-2.5 w-2.5 text-red-400" />}
+                  </div>
+                  {/* Close PiP button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsPipVisible(false);
+                    }}
+                    className="absolute top-1 right-1 rounded p-0.5 bg-slate-900/80 text-slate-400 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                    title="Hide picture-in-picture"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
-            /* Multi-Peer Video Grid */
+            /* MULTI-PEER EQUAL GRID (Click any tile to pin) */
             <div className={`grid h-full w-full gap-2 sm:gap-4 ${getGridClass()} max-h-full`}>
               {/* Local Tile */}
-              <div className="relative overflow-hidden rounded-xl sm:rounded-2xl border border-slate-800 bg-slate-900 shadow-xl flex items-center justify-center">
+              <div
+                onClick={() => setPinnedId('local')}
+                className={`group relative cursor-pointer overflow-hidden rounded-xl sm:rounded-2xl border bg-slate-900 shadow-xl flex items-center justify-center transition-all duration-200 hover:border-indigo-500/70 hover:scale-[1.01] ${
+                  activeSpeakers.has('local')
+                    ? 'border-emerald-400 ring-2 ring-emerald-400/80 shadow-[0_0_16px_rgba(52,211,153,0.35)]'
+                    : 'border-slate-800'
+                }`}
+                title="Click to pin your video"
+              >
                 <video
                   ref={(el) => {
                     if (el && localStream && el.srcObject !== localStream) {
@@ -1349,6 +1942,10 @@ export default function RoomPage() {
                   )}
                   {isMuted && <MicOff className="h-3.5 w-3.5 text-red-400 shrink-0" />}
                 </div>
+                {/* Pin hover tooltip icon */}
+                <div className="absolute top-2 right-2 rounded-lg bg-slate-950/80 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity border border-slate-700 shadow-md">
+                  <Pin className="h-3.5 w-3.5 text-indigo-400" />
+                </div>
               </div>
 
               {/* Remote Participant Tiles */}
@@ -1357,11 +1954,18 @@ export default function RoomPage() {
                 const stream = peerInfo?.stream;
                 const name = peerInfo?.name || `Peer (${peerId.substring(0, 8)})`;
                 const peerIsAdmin = Boolean(peerInfo?.isAdmin);
+                const isSpeaking = activeSpeakers.has(peerId);
 
                 return (
                   <div
                     key={peerId}
-                    className="relative overflow-hidden rounded-xl sm:rounded-2xl border border-slate-800 bg-slate-900 shadow-xl flex items-center justify-center"
+                    onClick={() => setPinnedId(peerId)}
+                    className={`group relative cursor-pointer overflow-hidden rounded-xl sm:rounded-2xl border bg-slate-900 shadow-xl flex items-center justify-center transition-all duration-200 hover:border-indigo-500/70 hover:scale-[1.01] ${
+                      isSpeaking
+                        ? 'border-emerald-400 ring-2 ring-emerald-400/80 shadow-[0_0_16px_rgba(52,211,153,0.35)]'
+                        : 'border-slate-800'
+                    }`}
+                    title={`Click to pin ${name}`}
                   >
                     {stream ? (
                       <video
@@ -1375,6 +1979,7 @@ export default function RoomPage() {
                         }}
                         autoPlay
                         playsInline
+                        muted={isSpeakerMuted}
                         className="h-full w-full object-cover"
                       />
                     ) : (
@@ -1396,6 +2001,10 @@ export default function RoomPage() {
                         </span>
                       )}
                     </div>
+                    {/* Pin hover tooltip icon */}
+                    <div className="absolute top-2 right-2 rounded-lg bg-slate-950/80 p-1.5 opacity-0 group-hover:opacity-100 transition-opacity border border-slate-700 shadow-md">
+                      <Pin className="h-3.5 w-3.5 text-indigo-400" />
+                    </div>
                   </div>
                 );
               })}
@@ -1406,92 +2015,140 @@ export default function RoomPage() {
         {/* Floating Call Controls Dock */}
         <div className="flex h-16 sm:h-20 items-center justify-center border-t border-slate-800/80 bg-slate-900/90 px-2 sm:px-4 backdrop-blur-xl shrink-0">
           <div className="flex items-center gap-2 sm:gap-4">
-            {/* Audio Mute/Unmute */}
-            <button
-              type="button"
-              onClick={toggleMute}
-              className={`flex h-11 w-11 sm:h-12 sm:w-12 flex-col items-center justify-center rounded-xl sm:rounded-2xl transition-all shadow-md ${
-                isMuted
-                  ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20'
-                  : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-              }`}
-              title={isMuted ? 'Unmute microphone' : 'Mute microphone'}
-            >
-              {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
-            </button>
+            {/* Audio Mute/Unmute (Microphone) */}
+            <div className="group relative flex items-center justify-center">
+              <button
+                type="button"
+                onClick={toggleMute}
+                className={`flex h-11 w-11 sm:h-12 sm:w-12 flex-col items-center justify-center rounded-xl sm:rounded-2xl transition-all shadow-md active:scale-95 ${
+                  isMuted
+                    ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20'
+                    : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                }`}
+              >
+                {isMuted ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              </button>
+              {/* Tooltip */}
+              <div className="pointer-events-none absolute -top-12 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-900/95 px-2.5 py-1 text-xs text-slate-200 shadow-xl backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-150">
+                <span>{isMuted ? 'Unmute microphone' : 'Mute microphone'}</span>
+                <kbd className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-indigo-300 border border-slate-700">M</kbd>
+              </div>
+            </div>
+
+            {/* Mute/Unmute Output Sound (Speaker Audio) */}
+            <div className="group relative flex items-center justify-center">
+              <button
+                type="button"
+                onClick={toggleSpeakerMute}
+                className={`flex h-11 w-11 sm:h-12 sm:w-12 flex-col items-center justify-center rounded-xl sm:rounded-2xl transition-all shadow-md active:scale-95 ${
+                  isSpeakerMuted
+                    ? 'bg-amber-600 text-white hover:bg-amber-700 shadow-amber-600/20 ring-2 ring-amber-400/50'
+                    : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                }`}
+              >
+                {isSpeakerMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+              </button>
+              {/* Tooltip */}
+              <div className="pointer-events-none absolute -top-12 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-900/95 px-2.5 py-1 text-xs text-slate-200 shadow-xl backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-150">
+                <span>{isSpeakerMuted ? 'Unmute speaker audio' : 'Mute speaker audio (Deafen)'}</span>
+                <kbd className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-indigo-300 border border-slate-700">O</kbd>
+              </div>
+            </div>
 
             {/* Video On/Off */}
-            <button
-              type="button"
-              onClick={toggleVideo}
-              className={`flex h-11 w-11 sm:h-12 sm:w-12 flex-col items-center justify-center rounded-xl sm:rounded-2xl transition-all shadow-md ${
-                isVideoOff
-                  ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20'
-                  : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-              }`}
-              title={isVideoOff ? 'Start video' : 'Stop video'}
-            >
-              {isVideoOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
-            </button>
+            <div className="group relative flex items-center justify-center">
+              <button
+                type="button"
+                onClick={toggleVideo}
+                className={`flex h-11 w-11 sm:h-12 sm:w-12 flex-col items-center justify-center rounded-xl sm:rounded-2xl transition-all shadow-md active:scale-95 ${
+                  isVideoOff
+                    ? 'bg-red-500 text-white hover:bg-red-600 shadow-red-500/20'
+                    : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                }`}
+              >
+                {isVideoOff ? <VideoOff className="h-5 w-5" /> : <Video className="h-5 w-5" />}
+              </button>
+              {/* Tooltip */}
+              <div className="pointer-events-none absolute -top-12 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-900/95 px-2.5 py-1 text-xs text-slate-200 shadow-xl backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-150">
+                <span>{isVideoOff ? 'Turn on camera' : 'Turn off camera'}</span>
+                <kbd className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-indigo-300 border border-slate-700">V</kbd>
+              </div>
+            </div>
 
             {/* Screen Share (Desktop only) */}
-            <button
-              type="button"
-              disabled={!permissions.allowScreenShare}
-              onClick={toggleScreenShare}
-              className={`hidden sm:flex h-12 w-12 flex-col items-center justify-center rounded-2xl transition-all shadow-md ${
-                !permissions.allowScreenShare
-                  ? 'bg-slate-800/50 text-slate-600 cursor-not-allowed opacity-50'
-                  : isScreenSharing
-                  ? 'bg-indigo-600 text-white shadow-indigo-600/30'
-                  : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-              }`}
-              title={
-                !permissions.allowScreenShare
-                  ? 'Screen sharing disabled by admin'
-                  : isScreenSharing
-                  ? 'Stop sharing screen'
-                  : 'Share screen'
-              }
-            >
-              {isScreenSharing ? <MonitorOff className="h-5 w-5" /> : <MonitorUp className="h-5 w-5" />}
-            </button>
+            <div className="group relative hidden sm:flex items-center justify-center">
+              <button
+                type="button"
+                disabled={!permissions.allowScreenShare}
+                onClick={toggleScreenShare}
+                className={`flex h-11 w-11 sm:h-12 sm:w-12 items-center justify-center rounded-xl sm:rounded-2xl transition-all shadow-md active:scale-95 ${
+                  !permissions.allowScreenShare
+                    ? 'bg-slate-800/50 text-slate-600 cursor-not-allowed opacity-50'
+                    : isScreenSharing
+                    ? 'bg-indigo-600 text-white shadow-indigo-600/30'
+                    : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                }`}
+              >
+                {isScreenSharing ? <MonitorOff className="h-5 w-5" /> : <MonitorUp className="h-5 w-5" />}
+              </button>
+              {/* Tooltip */}
+              <div className="pointer-events-none absolute -top-12 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-900/95 px-2.5 py-1 text-xs text-slate-200 shadow-xl backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-150">
+                <span>
+                  {!permissions.allowScreenShare
+                    ? 'Screen sharing disabled by admin'
+                    : isScreenSharing
+                    ? 'Stop sharing screen'
+                    : 'Present screen to everyone'}
+                </span>
+              </div>
+            </div>
 
             {/* Live Chat Toggle */}
-            <button
-              type="button"
-              disabled={!permissions.allowChat}
-              onClick={() => {
-                setIsChatOpen((prev) => !prev);
-                setUnreadCount(0);
-              }}
-              className={`relative flex h-11 w-11 sm:h-12 sm:w-12 flex-col items-center justify-center rounded-xl sm:rounded-2xl transition-all shadow-md ${
-                !permissions.allowChat
-                  ? 'bg-slate-800/50 text-slate-600 cursor-not-allowed opacity-50'
-                  : isChatOpen
-                  ? 'bg-indigo-600 text-white shadow-indigo-600/30'
-                  : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
-              }`}
-              title={!permissions.allowChat ? 'Chat disabled by admin' : 'Toggle chat'}
-            >
-              <MessageSquare className="h-5 w-5" />
-              {unreadCount > 0 && !isChatOpen && (
-                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow">
-                  {unreadCount}
-                </span>
-              )}
-            </button>
+            <div className="group relative flex items-center justify-center">
+              <button
+                type="button"
+                disabled={!permissions.allowChat}
+                onClick={() => {
+                  setIsChatOpen((prev) => !prev);
+                  setUnreadCount(0);
+                }}
+                className={`relative flex h-11 w-11 sm:h-12 sm:w-12 flex-col items-center justify-center rounded-xl sm:rounded-2xl transition-all shadow-md active:scale-95 ${
+                  !permissions.allowChat
+                    ? 'bg-slate-800/50 text-slate-600 cursor-not-allowed opacity-50'
+                    : isChatOpen
+                    ? 'bg-indigo-600 text-white shadow-indigo-600/30'
+                    : 'bg-slate-800 text-slate-200 hover:bg-slate-700'
+                }`}
+              >
+                <MessageSquare className="h-5 w-5" />
+                {unreadCount > 0 && !isChatOpen && (
+                  <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+              {/* Tooltip */}
+              <div className="pointer-events-none absolute -top-12 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-700 bg-slate-900/95 px-2.5 py-1 text-xs text-slate-200 shadow-xl backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-150">
+                <span>{isChatOpen ? 'Close in-call chat' : 'Open in-call chat'}</span>
+                <kbd className="rounded bg-slate-800 px-1.5 py-0.5 font-mono text-[10px] text-indigo-300 border border-slate-700">C</kbd>
+              </div>
+            </div>
 
             {/* End / Leave Call */}
-            <button
-              type="button"
-              onClick={handleLeaveCall}
-              className="flex h-11 sm:h-12 items-center gap-1.5 sm:gap-2 rounded-xl sm:rounded-2xl bg-red-600 px-3.5 sm:px-5 text-xs font-bold text-white shadow-lg shadow-red-600/30 transition-all hover:bg-red-700 hover:scale-[1.02] active:scale-[0.98]"
-              title="Leave call"
-            >
-              <PhoneOff className="h-4 w-4" />
-              <span>Leave</span>
-            </button>
+            <div className="group relative flex items-center justify-center">
+              <button
+                type="button"
+                onClick={handleLeaveCall}
+                className="flex h-11 sm:h-12 items-center gap-1.5 sm:gap-2 rounded-xl sm:rounded-2xl bg-red-600 px-3.5 sm:px-5 text-xs font-bold text-white shadow-lg shadow-red-600/30 transition-all hover:bg-red-700 hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <PhoneOff className="h-4 w-4" />
+                <span>Leave</span>
+              </button>
+              {/* Tooltip */}
+              <div className="pointer-events-none absolute -top-12 left-1/2 -translate-x-1/2 z-50 whitespace-nowrap rounded-lg border border-red-500/40 bg-slate-900/95 px-2.5 py-1 text-xs text-red-300 shadow-xl backdrop-blur-md opacity-0 group-hover:opacity-100 transition-all duration-150">
+                <span>Disconnect from call</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -1580,6 +2237,67 @@ export default function RoomPage() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+      {/* Keyboard Shortcuts Cheat Sheet Modal */}
+      {isShortcutsModalOpen && (
+        <div
+          onClick={() => setIsShortcutsModalOpen(false)}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-in fade-in duration-150"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2 text-white font-bold text-sm">
+                <Keyboard className="h-4 w-4 text-indigo-400" />
+                <span>Keyboard Shortcuts</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsShortcutsModalOpen(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 text-xs text-slate-300">
+              <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
+                <span>Mute / Unmute microphone</span>
+                <kbd className="rounded bg-slate-800 px-2 py-0.5 font-mono text-[11px] text-indigo-300 border border-slate-700">M</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
+                <span>Mute / Unmute speaker audio</span>
+                <kbd className="rounded bg-slate-800 px-2 py-0.5 font-mono text-[11px] text-indigo-300 border border-slate-700">O</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
+                <span>Turn camera on / off</span>
+                <kbd className="rounded bg-slate-800 px-2 py-0.5 font-mono text-[11px] text-indigo-300 border border-slate-700">V</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
+                <span>Toggle in-call chat</span>
+                <kbd className="rounded bg-slate-800 px-2 py-0.5 font-mono text-[11px] text-indigo-300 border border-slate-700">C</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
+                <span>Toggle fullscreen mode</span>
+                <kbd className="rounded bg-slate-800 px-2 py-0.5 font-mono text-[11px] text-indigo-300 border border-slate-700">F</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
+                <span>Unpin / Close panels</span>
+                <kbd className="rounded bg-slate-800 px-2 py-0.5 font-mono text-[11px] text-indigo-300 border border-slate-700">Esc</kbd>
+              </div>
+              <div className="flex items-center justify-between py-1">
+                <span>Show keyboard shortcuts</span>
+                <kbd className="rounded bg-slate-800 px-2 py-0.5 font-mono text-[11px] text-indigo-300 border border-slate-700">?</kbd>
+              </div>
+            </div>
+
+            <div className="pt-2 text-center">
+              <span className="text-[11px] text-slate-500">Shortcuts are disabled while typing in text inputs.</span>
+            </div>
+          </div>
         </div>
       )}
     </div>

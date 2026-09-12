@@ -67,6 +67,7 @@ export function RoomProvider({ children }) {
 
   const [deletedRoomNotification, setDeletedRoomNotification] = useState(null);
   const [isRoomsLoaded, setIsRoomsLoaded] = useState(false);
+  const [isInCall, setIsInCall] = useState(false);
 
   // Sync with Server REST API on initial mount
   useEffect(() => {
@@ -326,6 +327,8 @@ export function RoomProvider({ children }) {
         logoutAdmin,
         deletedRoomNotification,
         isRoomsLoaded,
+        isInCall,
+        setIsInCall,
       }}
     >
       {children}

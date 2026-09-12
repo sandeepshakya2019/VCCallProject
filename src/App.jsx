@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, useParams } from 'react-router-dom';
-import { RoomProvider } from './context/RoomContext';
+import { RoomProvider, useRoomContext } from './context/RoomContext';
 import Navbar from './components/Navbar';
 import LobbyPage from './pages/LobbyPage';
 import RoomPage from './pages/RoomPage';
@@ -56,9 +56,10 @@ function AppLayout() {
 
 function RoomRouteWrapper() {
   const { roomNumber } = useParams();
+  const { isInCall } = useRoomContext();
   return (
     <>
-      <Navbar currentRoomNumber={roomNumber} />
+      {!isInCall && <Navbar currentRoomNumber={roomNumber} />}
       <main className="flex-1 overflow-hidden">
         <RoomPage />
       </main>
