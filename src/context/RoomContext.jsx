@@ -68,6 +68,8 @@ export function RoomProvider({ children }) {
   const [deletedRoomNotification, setDeletedRoomNotification] = useState(null);
   const [isRoomsLoaded, setIsRoomsLoaded] = useState(false);
   const [isInCall, setIsInCall] = useState(false);
+  const [roomCounts, setRoomCounts] = useState({});
+  const syncWsRef = React.useRef(null);
 
   // Sync with Server REST API on initial mount
   useEffect(() => {
@@ -78,7 +80,10 @@ export function RoomProvider({ children }) {
           setRooms(data.rooms);
           try {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(data.rooms));
-          } catch (e) {}
+          } catch {}
+        }
+        if (data?.roomCounts) {
+          setRoomCounts(data.roomCounts);
         }
       })
       .catch((err) => {
@@ -100,6 +105,7 @@ export function RoomProvider({ children }) {
           window.location.protocol === "https:" ? "wss:" : "ws:";
         const wsUrl = `${wsProtocol}//${window.location.host}/signaling`;
         ws = new WebSocket(wsUrl);
+        syncWsRef.current = ws;
 
         ws.onopen = () => {
           // Request latest rooms from server
@@ -116,14 +122,16 @@ export function RoomProvider({ children }) {
               setRooms(data.rooms);
               try {
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(data.rooms));
-              } catch (e) {}
+              } catch {}
+            } else if (data.type === "ROOM_COUNTS_UPDATED" && data.counts) {
+              setRoomCounts(data.counts);
             } else if (data.type === "ROOM_DELETED") {
               const targetNum = String(data.roomNumber).trim();
               if (Array.isArray(data.rooms)) {
                 setRooms(data.rooms);
                 try {
                   localStorage.setItem(STORAGE_KEY, JSON.stringify(data.rooms));
-                } catch (e) {}
+                } catch {}
               } else {
                 setRooms((prev) => {
                   const updated = prev.filter(
@@ -131,7 +139,7 @@ export function RoomProvider({ children }) {
                   );
                   try {
                     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-                  } catch (e) {}
+                  } catch {}
                   return updated;
                 });
               }
@@ -157,7 +165,7 @@ export function RoomProvider({ children }) {
       if (ws) {
         try {
           ws.close();
-        } catch (e) {}
+        } catch {}
       }
     };
   }, []);
@@ -225,7 +233,7 @@ export function RoomProvider({ children }) {
         });
       }
       channel.close();
-    } catch (e) {
+    } catch {
       // Ignored if BroadcastChannel is not supported
     }
   };
@@ -314,10 +322,26 @@ export function RoomProvider({ children }) {
     sessionStorage.removeItem(ADMIN_SESSION_KEY);
   };
 
+  const sendGlobalAnnouncement = (message) => {
+    if (syncWsRef.current && syncWsRef.current.readyState === 1) {
+      syncWsRef.current.send(
+        JSON.stringify({
+          type: "ADMIN_BROADCAST_ANNOUNCEMENT",
+          message,
+          sender: "System Admin",
+        })
+      );
+      return true;
+    }
+    return false;
+  };
+
   return (
     <RoomContext.Provider
       value={{
         rooms,
+        roomCounts,
+        sendGlobalAnnouncement,
         createRoom,
         updateRoomPermissions,
         deleteRoom,

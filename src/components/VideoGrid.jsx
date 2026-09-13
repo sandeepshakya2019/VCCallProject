@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { User, VideoOff, MicOff, Maximize2, Minimize2 } from 'lucide-react';
+import { User, VideoOff, MicOff } from 'lucide-react';
 
 export default function VideoGrid({
   localStream,

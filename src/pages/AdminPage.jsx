@@ -10,11 +10,6 @@ import {
   Check,
   Copy,
   ExternalLink,
-  MessageSquare,
-  Monitor,
-  Video,
-  Mic,
-  AlertTriangle,
   LogOut,
   Sparkles,
 } from "lucide-react";
@@ -30,10 +25,14 @@ export default function AdminPage() {
     isAdminLoggedIn,
     loginAdmin,
     logoutAdmin,
+    roomCounts,
+    sendGlobalAnnouncement,
   } = useRoomContext();
 
   const [passwordInput, setPasswordInput] = useState("");
   const [authError, setAuthError] = useState("");
+  const [announcementText, setAnnouncementText] = useState("");
+  const [announcementSent, setAnnouncementSent] = useState(false);
 
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -229,6 +228,48 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* Global Broadcast Announcement Card */}
+        <div className="my-6 rounded-2xl border border-indigo-500/30 bg-indigo-950/20 p-5 backdrop-blur-xl shadow-xl">
+          <div className="flex items-center gap-2 text-indigo-300 font-bold text-sm">
+            <Sparkles className="h-4 w-4 text-indigo-400" />
+            <span>LAN Global Broadcast Announcement</span>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            Broadcast an urgent high-priority banner notification to all attendees in all active rooms simultaneously.
+          </p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (!announcementText.trim()) return;
+              sendGlobalAnnouncement(announcementText.trim());
+              setAnnouncementSent(true);
+              setAnnouncementText("");
+              setTimeout(() => setAnnouncementSent(false), 3000);
+            }}
+            className="mt-3 flex flex-col sm:flex-row gap-2"
+          >
+            <input
+              type="text"
+              value={announcementText}
+              onChange={(e) => setAnnouncementText(e.target.value)}
+              placeholder="e.g. Scheduled maintenance in 10 minutes, please wrap up calls..."
+              className="flex-1 rounded-xl border border-slate-700 bg-slate-900 px-3.5 py-2 text-xs text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={!announcementText.trim()}
+              className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-500 transition-colors disabled:opacity-50"
+            >
+              Broadcast
+            </button>
+          </form>
+          {announcementSent && (
+            <p className="text-[11px] text-emerald-400 mt-2 font-semibold">
+              ✓ Announcement broadcast successfully to all active calls!
+            </p>
+          )}
+        </div>
+
         {/* Stats Row */}
         <div className="my-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
@@ -270,6 +311,7 @@ export default function AdminPage() {
             ) : (
               rooms.map((room) => {
                 const perms = room.permissions || {};
+                const activeCount = roomCounts?.[room.roomNumber] || 0;
                 return (
                   <div
                     key={room.roomNumber}
@@ -281,6 +323,12 @@ export default function AdminPage() {
                         <span className="rounded-md bg-indigo-500/10 px-2.5 py-0.5 font-mono text-sm font-bold text-indigo-400 border border-indigo-500/20">
                           #{room.roomNumber}
                         </span>
+                        {activeCount > 0 && (
+                          <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-bold text-emerald-300 animate-pulse">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                            <span>{activeCount} active in call</span>
+                          </span>
+                        )}
                         <h3 className="text-base font-semibold text-white">
                           {room.roomName}
                         </h3>

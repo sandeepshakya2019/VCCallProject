@@ -13,16 +13,15 @@ import {
   ShieldAlert,
   Users,
   Lock,
-  Sparkles,
   ExternalLink,
   Wifi,
 } from "lucide-react";
 import { useRoomContext } from "../context/RoomContext";
-import { getBaseNetworkUrl, getNetworkIp } from "../utils/network";
+import { getBaseNetworkUrl } from "../utils/network";
 
 export default function LobbyPage() {
   const navigate = useNavigate();
-  const { rooms, getRoom } = useRoomContext();
+  const { rooms, getRoom, roomCounts } = useRoomContext();
 
   const [roomNumberInput, setRoomNumberInput] = useState("");
   const [displayName, setDisplayName] = useState(() => {
@@ -30,16 +29,18 @@ export default function LobbyPage() {
   });
 
   // Local Media Preview State
-  const [localStream, setLocalStream] = useState(null);
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   const [mediaError, setMediaError] = useState("");
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedIp, setCopiedIp] = useState(false);
   const [formError, setFormError] = useState("");
+  const [audioLevel, setAudioLevel] = useState(0); // 0 to 100
 
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const animationFrameRef = useRef(null);
 
   // Initialize camera and mic
   useEffect(() => {
@@ -50,9 +51,37 @@ export default function LobbyPage() {
           audio: true,
         });
         streamRef.current = stream;
-        setLocalStream(stream);
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+        }
+
+        // Setup audio level meter
+        try {
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          audioContextRef.current = audioCtx;
+          const source = audioCtx.createMediaStreamSource(stream);
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 256;
+          source.connect(analyser);
+
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+          const updateMeter = () => {
+            if (!streamRef.current || !streamRef.current.getAudioTracks()[0]?.enabled) {
+              setAudioLevel(0);
+            } else {
+              analyser.getByteFrequencyData(dataArray);
+              let sum = 0;
+              for (let i = 0; i < dataArray.length; i++) {
+                sum += dataArray[i];
+              }
+              const average = sum / dataArray.length;
+              setAudioLevel(Math.min(100, Math.round((average / 128) * 100)));
+            }
+            animationFrameRef.current = requestAnimationFrame(updateMeter);
+          };
+          updateMeter();
+        } catch (audioErr) {
+          console.warn("Audio meter setup error:", audioErr);
         }
       } catch (err) {
         console.warn("Camera preview failed:", err);
@@ -67,6 +96,12 @@ export default function LobbyPage() {
     return () => {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
+      }
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+        audioContextRef.current.close().catch(() => {});
       }
     };
   }, []);
@@ -359,10 +394,20 @@ export default function LobbyPage() {
               </div>
 
               <div className="flex items-center justify-between border-t border-slate-800 px-4 py-2.5 text-xs text-slate-400">
-                <span>Self Camera Preview</span>
-                <span className="flex items-center gap-1.5 text-emerald-400">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400"></span>
-                  Active
+                <div className="flex items-center gap-2 flex-1 mr-4">
+                  <Mic className={`h-3.5 w-3.5 shrink-0 ${isMuted ? 'text-red-400' : audioLevel > 5 ? 'text-emerald-400' : 'text-slate-500'}`} />
+                  <div className="flex-1 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-75 ${
+                        audioLevel > 60 ? 'bg-amber-400' : 'bg-emerald-400'
+                      }`}
+                      style={{ width: `${isMuted ? 0 : audioLevel}%` }}
+                    />
+                  </div>
+                </div>
+                <span className="flex items-center gap-1.5 text-emerald-400 shrink-0">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  Ready
                 </span>
               </div>
             </div>
@@ -428,9 +473,17 @@ export default function LobbyPage() {
                 <div>
                   <div className="flex items-start justify-between">
                     <div>
-                      <span className="inline-block rounded-md bg-indigo-500/10 px-2.5 py-0.5 font-mono text-xs font-bold text-indigo-400 border border-indigo-500/20">
-                        #{room.roomNumber}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-block rounded-md bg-indigo-500/10 px-2.5 py-0.5 font-mono text-xs font-bold text-indigo-400 border border-indigo-500/20">
+                          #{room.roomNumber}
+                        </span>
+                        {roomCounts?.[room.roomNumber] > 0 && (
+                          <span className="flex items-center gap-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 text-[10px] font-bold text-emerald-300 animate-pulse">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                            <span>{roomCounts[room.roomNumber]} in call</span>
+                          </span>
+                        )}
+                      </div>
                       <h4 className="mt-2 text-base font-semibold text-white group-hover:text-indigo-300 transition-colors">
                         {room.roomName}
                       </h4>

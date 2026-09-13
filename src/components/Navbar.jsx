@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Video, Shield, Home, Sparkles } from 'lucide-react';
+import { Video, Shield, Home } from 'lucide-react';
 import { useRoomContext } from '../context/RoomContext';
 
 export default function Navbar({ currentRoomNumber }) {

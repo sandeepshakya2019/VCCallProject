@@ -59,12 +59,21 @@ export function createSyntheticStream(userName = 'User') {
       if (AudioCtx) {
         const audioCtx = new AudioCtx();
         const osc = audioCtx.createOscillator();
-        const dst = osc.connect(audioCtx.createMediaStreamDestination());
+        const dst = audioCtx.createMediaStreamDestination();
+        osc.connect(dst);
         osc.start();
         audioTrack = dst.stream.getAudioTracks()[0];
-        if (audioTrack) audioTrack.enabled = false;
+        if (audioTrack) {
+          audioTrack.enabled = false;
+          audioTrack.addEventListener('ended', () => {
+            try {
+              osc.stop();
+              audioCtx.close().catch(() => {});
+            } catch {}
+          });
+        }
       }
-    } catch (e) {
+    } catch {
       // AudioContext not supported in this environment
     }
 
