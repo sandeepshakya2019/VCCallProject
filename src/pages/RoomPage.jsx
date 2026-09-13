@@ -154,6 +154,7 @@ export default function RoomPage() {
   const dataConnsRef = useRef({}); // { peerId: conn }
   const wsRef = useRef(null);
   const roomChannelRef = useRef(null);
+  const removePeerRef = useRef(null);
   const chatBottomRef = useRef(null);
   const myPeerIdRef = useRef('');
   const userNameRef = useRef('');
@@ -1072,8 +1073,6 @@ export default function RoomPage() {
     peer.on('open', (id) => {
       console.log(`[PeerJS] Connected with ID: ${id}`);
       setMyPeerId(id);
-      setIsPeerReady(true);
-      setConnectionStatus('Connected');
 
       // Record self in attendance log
       attendanceMapRef.current[id] = {
@@ -1556,6 +1555,7 @@ export default function RoomPage() {
         return updated;
       });
     };
+    removePeerRef.current = removePeer;
 
     peer.on('error', (err) => {
       console.warn('Peer error:', err);
@@ -1592,6 +1592,7 @@ export default function RoomPage() {
       if (peerInstance) {
         peerInstance.destroy();
       }
+      removePeerRef.current = null;
     };
   }, [isJoined, roomNumber, playSound, startKnocking, handleLeaveCall, startScreenCapture, stopScreenShare, navigate]);
 
@@ -1688,7 +1689,7 @@ export default function RoomPage() {
   const handleAdminKickPeer = (targetPeerId, targetName) => {
     if (window.confirm(`Are you sure you want to remove ${targetName || 'this participant'} from the call?`)) {
       broadcastData({ type: 'KICK_PARTICIPANT', targetPeerId });
-      removePeer(targetPeerId);
+      removePeerRef.current?.(targetPeerId);
     }
   };
 

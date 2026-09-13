@@ -57,7 +57,9 @@ export default function LobbyPage() {
 
         // Setup audio level meter
         try {
-          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const audioCtx = new (
+            window.AudioContext || window.webkitAudioContext
+          )();
           audioContextRef.current = audioCtx;
           const source = audioCtx.createMediaStreamSource(stream);
           const analyser = audioCtx.createAnalyser();
@@ -66,7 +68,10 @@ export default function LobbyPage() {
 
           const dataArray = new Uint8Array(analyser.frequencyBinCount);
           const updateMeter = () => {
-            if (!streamRef.current || !streamRef.current.getAudioTracks()[0]?.enabled) {
+            if (
+              !streamRef.current ||
+              !streamRef.current.getAudioTracks()[0]?.enabled
+            ) {
               setAudioLevel(0);
             } else {
               analyser.getByteFrequencyData(dataArray);
@@ -100,7 +105,10 @@ export default function LobbyPage() {
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      if (
+        audioContextRef.current &&
+        audioContextRef.current.state !== "closed"
+      ) {
         audioContextRef.current.close().catch(() => {});
       }
     };
@@ -176,28 +184,6 @@ export default function LobbyPage() {
     <div className="min-h-[calc(100dvh-3.5rem)] sm:min-h-[calc(100dvh-4rem)] bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 px-3 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="mx-auto max-w-5xl">
         {/* Header Title */}
-        <div className="mb-6 text-center sm:mb-10">
-          {/* <div className="inline-flex items-center gap-2 rounded-full border border-indigo-500/30 bg-indigo-500/10 px-3.5 py-1.5 text-xs font-semibold text-indigo-300 mb-3 backdrop-blur-md">
-            <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <Wifi className="h-3.5 w-3.5 text-indigo-400" />
-            <span>Network IP: <strong className="font-mono text-white tracking-wide">{getNetworkIp()}</strong></span>
-            <button
-              type="button"
-              onClick={handleCopyIp}
-              className="ml-1 rounded p-1 hover:bg-indigo-500/20 text-indigo-300 hover:text-white transition-colors"
-              title="Copy Network Portal Link"
-            >
-              {copiedIp ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-            </button>
-          </div> */}
-          <h1 className="text-2xl font-extrabold tracking-tight text-white sm:text-5xl">
-            Enter Room Number to Join
-          </h1>
-          <p className="mx-auto mt-2 max-w-xl text-xs sm:text-sm text-slate-400">
-            Connect directly with colleagues on your local network. Pure
-            peer-to-peer streaming with zero server recording.
-          </p>
-        </div>
 
         {/* Media Warning if any */}
         {mediaError && (
@@ -395,11 +381,13 @@ export default function LobbyPage() {
 
               <div className="flex items-center justify-between border-t border-slate-800 px-4 py-2.5 text-xs text-slate-400">
                 <div className="flex items-center gap-2 flex-1 mr-4">
-                  <Mic className={`h-3.5 w-3.5 shrink-0 ${isMuted ? 'text-red-400' : audioLevel > 5 ? 'text-emerald-400' : 'text-slate-500'}`} />
+                  <Mic
+                    className={`h-3.5 w-3.5 shrink-0 ${isMuted ? "text-red-400" : audioLevel > 5 ? "text-emerald-400" : "text-slate-500"}`}
+                  />
                   <div className="flex-1 h-1.5 rounded-full bg-slate-800 overflow-hidden">
                     <div
                       className={`h-full transition-all duration-75 ${
-                        audioLevel > 60 ? 'bg-amber-400' : 'bg-emerald-400'
+                        audioLevel > 60 ? "bg-amber-400" : "bg-emerald-400"
                       }`}
                       style={{ width: `${isMuted ? 0 : audioLevel}%` }}
                     />

@@ -307,8 +307,8 @@ export function RoomProvider({ children }) {
   };
 
   const loginAdmin = (enteredPassword) => {
-    // Read password from environment variable
-    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD;
+    // Read password from environment variable with reliable default fallback
+    const adminPassword = import.meta.env.VITE_ADMIN_PASSWORD || 'admin123';
     if (enteredPassword === adminPassword) {
       setIsAdminLoggedIn(true);
       sessionStorage.setItem(ADMIN_SESSION_KEY, "true");
