@@ -4,6 +4,24 @@ A modern, professional **Peer-to-Peer (P2P) Video Conferencing & Real-Time Colla
 
 ---
 
+## 📸 Product Screenshots & Visual Walkthrough
+
+| **Lobby & Room Selection** | **Pre-Join Audio/Video Preview** |
+|:---:|:---:|
+| ![Call Lobby](docs/screenshots/01-lobby.png) | ![Pre-Join Preview](docs/screenshots/02-prejoin-preview.png) |
+| *Discover LAN rooms, test camera/mic, and copy network invite links.* | *Verify camera, microphone, and choose whether to join as Host.* |
+
+| **Active Video Call Room** | **In-Call Chat & Real-Time Collaboration** |
+|:---:|:---:|
+| ![Active Video Call](docs/screenshots/04-active-call.png) | ![In-Call Chat Drawer](docs/screenshots/05-chat-and-collaboration.png) |
+| *Active speaker ring, floating controls dock, recording, and room lock.* | *P2P encrypted text messaging, emoji reactions, and shared agenda notes.* |
+
+### 🛡️ Admin Dashboard & Live Management
+![Admin Dashboard](docs/screenshots/03-admin-dashboard.png)
+*Manage rooms, toggle live permissions (camera/mic/screen/chat), lock rooms, and send global network announcements.*
+
+---
+
 ## 🌐 Why Local Network (LAN) Video Calling?
 
 Most video conferencing tools (Zoom, Google Meet, Microsoft Teams) route all audio, video, and screen data through external cloud servers across the public internet. This causes major drawbacks in localized environments:
@@ -19,26 +37,76 @@ Most video conferencing tools (Zoom, Google Meet, Microsoft Teams) route all aud
 
 ---
 
-## ✨ Features
+## ✨ Features & Capabilities
 
-- 🎥 **Peer-to-Peer HD Video & Audio**: Crystal-clear multi-peer mesh video calling directly between browsers.
-- 🔒 **Host Approval & Waiting Room ("Knock" Feature)**:
-  - Rooms configured with *"Ask Before Join"* require guest approval.
-  - Guests wait in a sleek waiting room until the host/admin enters and clicks **Admit**.
-- 🛡️ **Protected Admin Panel (`/admin`)**:
-  - Authenticated via secure password from `.env` (`VITE_ADMIN_PASSWORD`).
-  - **Create Rooms**: Define custom room numbers, names, and access rules.
-  - **Live Permission Controls**: Dynamically toggle Camera, Microphone, Screen Sharing, Text Chat, or Lock the room in real time.
-  - **Room Deletion**: Safely tear down rooms and notify/disconnect participants.
-- 💬 **Encrypted P2P Live Chat**: Ephemeral real-time chat running over WebRTC data channels with zero server storage.
-- 🖥️ **Screen Sharing**: One-click display and tab sharing on supported desktop browsers.
-- 📱 **Fully Mobile Responsive**:
-  - Adaptive Dynamic Viewport (`100dvh`) preventing mobile URL bar clipping.
-  - Ergonomic touch dock controls.
-  - Full-screen mobile chat overlay drawer with easy one-tap dismissal.
-  - Auto-zoom prevention on iOS Safari inputs.
-- 🔐 **Out-of-the-box HTTPS**: Built-in SSL via `@vitejs/plugin-basic-ssl` ensuring modern mobile browsers (iOS Safari, Android Chrome) permit camera and microphone access on local IP addresses.
-- 📋 **1-Click Network & Invite Links**: Easy copy buttons for local network URLs and direct room invites.
+### 🎥 Video, Audio & Grid Experience
+- **Direct P2P Full-Mesh Video**: Connects browsers directly with automated WebRTC negotiation—no media server in the middle.
+- **Active Speaker Highlighting**: Audio analysers monitor who is speaking in real time and illuminate their tile with a distinct ring.
+- **Spotlight & Pin Tile Mode**: Double-click any participant or screen share (or press `P`) to enlarge their video into center stage.
+- **Floating Picture-in-Picture (PiP)**: Keep an eye on active discussion while switching tabs or checking documents.
+- **Low Bandwidth Mode**: One-tap toggle that caps outbound video bitrate and frame rate to keep audio clear on congested Wi-Fi.
+- **Gentle Synthesized Audio Alerts**: Custom Web Audio tones signal joins, leaves, knocks, admitted status, chat messages, and raised hands without loading external MP3 files.
+
+### 🚪 Waiting Room & Host Moderation ("Knock to Enter")
+- **Knock Queue**: When a room has approval enabled, guests wait in a clean holding screen while the host reviews their request.
+- **Instant Admit or Deny**: Room hosts receive an interactive banner to admit or deny pending guests on the fly.
+- **Auto-Deny Safeguard**: Knock requests automatically expire after 2 minutes so unattended requests don't linger.
+- **Live Room Locking**: Admins can lock an active room at any moment to reject all new joiners.
+- **Host Moderation Tools**:
+  - Remote mute participants.
+  - Revoke or grant screen-sharing permissions on a per-user basis.
+  - Remove / kick participants from the active call.
+
+### 💬 In-Call Collaboration & Interaction
+- **Encrypted In-Call Chat**: Peer-to-peer text messaging over WebRTC data channels with unread badge indicators.
+- **Emoji Message Reactions**: React to chat messages with quick emoji reactions.
+- **Pin Important Messages**: Pin crucial links or notes to the top of the chat panel.
+- **Shared Meeting Agenda & Live Notes**: A collaborative agenda panel synced across all participants in real time.
+- **Hand Raising (✋)**: Participants can raise their virtual hand to request a speaking turn; hosts can lower hands as needed.
+- **Meeting Snapshot Camera**: Capture a composite screenshot of all participants in one click with room timestamp watermark.
+
+### 📊 Meeting Intelligence, Attendance & Local Recording
+- **100% Client-Side Recording**: Record audio and video locally directly to `.webm` using the browser's MediaRecorder API—zero cloud infrastructure or subscription required.
+- **Real-Time Attendance Tracker**: Automatically records join times, exit times, and roles for every participant.
+- **Download Meeting Summary**: Export a clean `.txt` summary containing meeting duration, full attendance log, agenda notes, and the chat transcript.
+- **WebRTC Network Inspector**: Real-time diagnostic modal showing Round-Trip Time (RTT), packet loss, resolution, framerate (FPS), and live bitrate per peer.
+
+### 🛡️ Admin Dashboard (`/admin`)
+- **Centralized Room Management**: Create and configure custom rooms (e.g., Room `101`, `Team Standup`, `Executive Board`).
+- **Granular Permission Toggles**:
+  - Enable or disable Cameras globally.
+  - Enable or disable Microphones globally.
+  - Allow or restrict Screen Sharing.
+  - Allow or restrict In-Call Chat.
+  - Require Host Knock Approval (*"Ask Before Join"*).
+- **Global Broadcast Announcements**: Push high-priority flash announcements to every active room across the entire LAN.
+- **Live Room Presence Counter**: View active participant counts across all rooms in real time.
+- **One-Click Session Teardown**: Deleting a room gracefully disconnects all connected peers and returns them to the lobby.
+
+### 📱 Thoughtful Mobile & Cross-Device UX
+- **Dynamic Viewport (`100dvh`)**: Prevents the mobile browser address bar from cutting off controls on iOS Safari and Android Chrome.
+- **Thumb-Friendly Touch Dock**: Floating bottom control dock designed for natural one-handed mobile navigation.
+- **Smart Camera/Mic Fallbacks**: If hardware permissions are blocked or locked by another app, the app falls back to audio-only or a synthetic avatar so you never get stuck.
+- **Built-in Self-Signed HTTPS**: Seamless camera and microphone capture on mobile devices over local IP addresses without browser security blocks.
+
+---
+
+## ⌨️ Built-in Keyboard Shortcuts
+
+Work faster during active meetings using single-key shortcuts:
+
+| Key | Action |
+|:---:|:---|
+| **M** | Toggle Microphone (Mute / Unmute) |
+| **V** | Toggle Camera (Video On / Off) |
+| **O** | Mute Output Audio (Deafen) |
+| **C** | Open / Close Chat Drawer |
+| **P** | Open / Close Participants Panel |
+| **H** | Raise or Lower Hand (✋) |
+| **S** | Take Meeting Snapshot |
+| **F** | Toggle Fullscreen Mode |
+| **?** | Open Keyboard Shortcuts Cheat Sheet |
+| **Esc** | Close Active Modals / Drawers / Unpin Tile |
 
 ---
 
