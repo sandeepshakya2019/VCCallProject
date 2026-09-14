@@ -145,6 +145,7 @@ export default function RoomPage() {
   const [recordingDuration, setRecordingDuration] = useState('00:00');
   const [raisedHands, setRaisedHands] = useState(new Set()); // Set of peerId (or 'local')
   const [globalAnnouncement, setGlobalAnnouncement] = useState(null); // { message, sender, timestamp }
+  const [autoplayBlocked, setAutoplayBlocked] = useState(false);
 
   // Refs
   const peerRef = useRef(null);
@@ -236,7 +237,28 @@ export default function RoomPage() {
     Object.values(dataConnsRef.current).forEach((conn) => {
       if (conn.open) conn.send(payload);
     });
-  }
+  };
+
+  // Global user interaction listener to unblock browser autoplay for audio/video
+  useEffect(() => {
+    const unlockMedia = () => {
+      document.querySelectorAll('video').forEach((v) => {
+        if (v.paused && v.srcObject) {
+          v.play().catch(() => {});
+        }
+      });
+      setAutoplayBlocked(false);
+    };
+
+    window.addEventListener('click', unlockMedia);
+    window.addEventListener('touchstart', unlockMedia);
+    window.addEventListener('keydown', unlockMedia);
+    return () => {
+      window.removeEventListener('click', unlockMedia);
+      window.removeEventListener('touchstart', unlockMedia);
+      window.removeEventListener('keydown', unlockMedia);
+    };
+  }, []);
 
   // ─── Helper: Play synthesized notification sounds ─────────────────────────
   const playSound = useCallback((type) => {
@@ -981,6 +1003,7 @@ export default function RoomPage() {
     const cleanRoom = String(roomNumber).replace(/[^a-zA-Z0-9_-]/g, '');
     const randomHex = generateRandomHex();
     const assignedPeerId = `vccall-${cleanRoom}-${randomHex}`;
+    myPeerIdRef.current = assignedPeerId;
     const peerNamesMap = new Map();
     const effectCalls = activeCallsRef.current;
     const effectConns = dataConnsRef.current;
@@ -1072,6 +1095,7 @@ export default function RoomPage() {
 
     peer.on('open', (id) => {
       console.log(`[PeerJS] Connected with ID: ${id}`);
+      myPeerIdRef.current = id;
       setMyPeerId(id);
 
       // Record self in attendance log
@@ -1230,6 +1254,7 @@ export default function RoomPage() {
 
     // Handle incoming or outgoing media call
     const handleIncomingCall = (call, isOutgoing = false, fallbackName = 'Peer', fallbackIsAdmin = false) => {
+      if (!call?.peer || call.peer === assignedPeerId) return;
       activeCallsRef.current[call.peer] = call;
 
       const remoteMetadata = call.metadata || {};
@@ -1245,7 +1270,7 @@ export default function RoomPage() {
         });
       }
 
-      call.on('stream', (incomingStream) => {
+      const onStreamReceived = (incomingStream) => {
         const peerRecord = peerNamesMap.get(call.peer);
         const displayName = peerRecord?.name || (!isOutgoing ? remoteMetadata.senderName : fallbackName) || 'Peer';
         const isPeerAdmin = peerRecord?.isAdmin ?? (!isOutgoing ? Boolean(remoteMetadata.isAdmin) : Boolean(fallbackIsAdmin));
@@ -1261,14 +1286,18 @@ export default function RoomPage() {
             isConnected: true,
           },
         }));
-      });
+      };
+
+      call.on('stream', onStreamReceived);
+      if (call.remoteStream) {
+        onStreamReceived(call.remoteStream);
+      }
 
       call.on('close', () => {
         if (activeCallsRef.current[call.peer] === call) {
           removePeer(call.peer);
         }
       });
-
 
       call.on('error', (err) => {
         console.warn('Call error:', err);
@@ -1288,6 +1317,7 @@ export default function RoomPage() {
 
     // Handle data connection and exchange names & admin roles
     const setupDataConnection = (conn, partnerName, partnerIsAdmin = false) => {
+      if (!conn?.peer || conn.peer === assignedPeerId) return;
       dataConnsRef.current[conn.peer] = conn;
 
       if (partnerName && partnerName !== userNameRef.current) {
@@ -1297,18 +1327,22 @@ export default function RoomPage() {
         });
       }
 
-      conn.on('open', () => {
+      const handleDataConnReady = () => {
         console.log(`[DataConn] Connection opened with: ${conn.peer}`);
 
         // Exchange names and admin status bidirectionally
-        conn.send({
-          type: 'NAME_HANDSHAKE',
-          name: userNameRef.current,
-          isAdmin: isAdminRef.current,
-          roomStartedAt: joinedAtRef.current,
-          agenda: agendaRef.current,
-          pinnedChatMessage: pinnedChatMessageRef.current,
-        });
+        try {
+          conn.send({
+            type: 'NAME_HANDSHAKE',
+            name: userNameRef.current,
+            isAdmin: isAdminRef.current,
+            roomStartedAt: joinedAtRef.current,
+            agenda: agendaRef.current,
+            pinnedChatMessage: pinnedChatMessageRef.current,
+          });
+        } catch (err) {
+          console.warn('[DataConn] Error sending handshake:', err);
+        }
 
         const peerRecord = peerNamesMap.get(conn.peer);
         const currentName = peerRecord?.name || partnerName || 'Peer';
@@ -1323,7 +1357,13 @@ export default function RoomPage() {
             isConnected: true,
           },
         }));
-      });
+      };
+
+      if (conn.open) {
+        handleDataConnReady();
+      } else {
+        conn.on('open', handleDataConnReady);
+      }
 
       conn.on('data', (data) => {
         if (data.type === 'CHAT_MSG') {
@@ -1429,25 +1469,25 @@ export default function RoomPage() {
             setIsMutedByAdmin(true);
             if (localStreamRef.current) {
               const audioTrack = localStreamRef.current.getAudioTracks()[0];
-              if (audioTrack && audioTrack.enabled) {
+              if (audioTrack) {
                 audioTrack.enabled = false;
-                setIsMuted(true);
-                playSound('admin_action');
-                alert(data.type === 'ADMIN_MUTE_ALL' ? 'The room host muted all participants. To speak, click unmute to request host permission.' : 'The room admin muted your microphone. To speak, click unmute to request host permission.');
               }
             }
+            setIsMuted(true);
+            playSound('admin_action');
+            alert(data.type === 'ADMIN_MUTE_ALL' ? 'The room host muted all participants. To speak, click unmute to request host permission.' : 'The room admin muted your microphone. To speak, click unmute to request host permission.');
           }
         } else if (data.type === 'ADMIN_STOP_VIDEO') {
           if (data.targetPeerId === myPeerIdRef.current) {
             if (localStreamRef.current) {
               const videoTrack = localStreamRef.current.getVideoTracks()[0];
-              if (videoTrack && videoTrack.enabled) {
+              if (videoTrack) {
                 videoTrack.enabled = false;
-                setIsVideoOff(true);
-                playSound('admin_action');
-                alert('The room admin turned off your camera.');
               }
             }
+            setIsVideoOff(true);
+            playSound('admin_action');
+            alert('The room admin turned off your camera.');
           }
         } else if (data.type === 'ADMIN_STOP_SHARE') {
           if (data.targetPeerId === myPeerIdRef.current && screenTrackRef.current) {
@@ -2618,7 +2658,7 @@ export default function RoomPage() {
   }
 
   // ACTIVE CALL SCREEN
-  const participantIds = Object.keys(participants);
+  const participantIds = Object.keys(participants).filter((id) => id && id !== myPeerIdRef.current && id !== myPeerId);
   const totalCount = participantIds.length + 1;
 
   const getGridClass = () => {
@@ -2998,6 +3038,21 @@ export default function RoomPage() {
           </div>
         )}
 
+        {/* Browser Autoplay Interlock Prompt */}
+        {autoplayBlocked && (
+          <div
+            onClick={() => {
+              document.querySelectorAll('video').forEach((v) => { if (v.paused && v.srcObject) v.play().catch(() => {}); });
+              setAutoplayBlocked(false);
+            }}
+            className="absolute top-14 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 cursor-pointer rounded-full border border-amber-500/60 bg-slate-900/95 px-4 py-1.5 text-xs font-bold text-amber-300 shadow-2xl backdrop-blur-md animate-bounce"
+            title="Click to activate audio and video"
+          >
+            <VolumeX className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+            <span>Audio & video paused by browser. Click anywhere to activate!</span>
+          </div>
+        )}
+
         {/* Video Stage Area (Grid vs Spotlight) */}
         <div className="relative flex-1 p-2 sm:p-4 overflow-hidden flex items-center justify-center min-h-0">
           {participantIds.length === 0 ? (
@@ -3116,7 +3171,12 @@ export default function RoomPage() {
                             ref={(el) => {
                               if (el && stream) {
                                 if (el.srcObject !== stream) el.srcObject = stream;
-                                el.play().catch(() => {});
+                                const playPromise = el.play();
+                                if (playPromise !== undefined) {
+                                  playPromise.catch((err) => {
+                                    if (err?.name === 'NotAllowedError') setAutoplayBlocked(true);
+                                  });
+                                }
                               }
                             }}
                             autoPlay
@@ -3468,7 +3528,12 @@ export default function RoomPage() {
                             if (el.srcObject !== stream) {
                               el.srcObject = stream;
                             }
-                            el.play().catch((err) => console.log('Autoplay handled for remote peer:', err));
+                            const playPromise = el.play();
+                            if (playPromise !== undefined) {
+                              playPromise.catch((err) => {
+                                if (err?.name === 'NotAllowedError') setAutoplayBlocked(true);
+                              });
+                            }
                           }
                         }}
                         autoPlay
